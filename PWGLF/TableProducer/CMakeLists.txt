@@ -209,3 +209,19 @@ o2physics_add_dpl_workflow(epvector
                     SOURCES epvector.cxx
                     PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore O2::DetectorsVertexing
                     COMPONENT_NAME Analysis)
+
+# ML selection
+o2physics_add_dpl_workflow(lambdakzerotreecreator
+                    SOURCES lambdakzeroTreeCreator.cxx
+                    PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore O2Physics::MLCore
+                    COMPONENT_NAME Analysis)
+
+o2physics_add_dpl_workflow(lambdakzeromlselection
+                    SOURCES lambdakzeromlselection.cxx
+                    PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore O2Physics::MLCore
+                    COMPONENT_NAME Analysis)
+
+o2physics_add_dpl_workflow(sigma0builder
+                    SOURCES sigma0builder.cxx
+                    PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore O2Physics::MLCore
+                    COMPONENT_NAME Analysis)
