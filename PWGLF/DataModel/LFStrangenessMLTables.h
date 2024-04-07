@@ -64,6 +64,7 @@ DECLARE_SOA_TABLE(V0MLCandidates, "AOD", "V0MLCANDIDATES",
 				v0mlcandidates::IsKZeroShort);
 
 
+<<<<<<< HEAD
 namespace V0MLSelection
 {
 DECLARE_SOA_COLUMN(GammaBDTScore, gammaBDTScore, float);

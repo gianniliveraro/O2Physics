@@ -100,7 +100,7 @@ struct sigma0builder{
       return false;
 
     // Lambda selection:
-    if( lambda.lambdaBDTScore() <= Lambda_MLThreshold) 
+    if( lambda.lambdaBDTScore() <= Lambda_MLThreshold)
       return false;
       
     std::array<float, 3> pVecPhotons{gamma.px(), gamma.py(), gamma.pz()};
@@ -225,7 +225,6 @@ struct sigma0builder{
 
         // Filling TTree for ML analysis
         v0MLSigmas(fSigmapT, fSigmaMass, fPhotonPt, fPhotonMass, fPhotonQt, fPhotonAlpha, fPhotonRadius, fPhotonCosPA, fPhotonDCADau, fPhotonDCANegPV, fPhotonDCAPosPV, fPhotonZconv, fLambdaPt, fLambdaMass, fLambdaQt, fLambdaAlpha, fLambdaRadius, fLambdaCosPA, fLambdaDCADau, fLambdaDCANegPV, fLambdaDCAPosPV, gamma.gammaBDTScore(), lambda.lambdaBDTScore());
-
       }
     }
     histos.fill(HIST("hNSigmaCandidates"), SigmaCounter);
