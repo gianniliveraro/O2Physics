@@ -192,7 +192,7 @@ struct sigma0builder{
           continue; 
         SigmaCounter ++; 
         
-        bool fIsSigma = false;
+        //bool fIsSigma = false;
 
         // Sigma related
         float fSigmapT = sigmaCandidate.pT;
@@ -223,7 +223,7 @@ struct sigma0builder{
         float fLambdaDCAPosPV = lambda.dcapostopv();
 
         // Filling TTree for ML analysis
-        v0MLSigmas(fSigmapT, fSigmaMass, fPhotonPt, fPhotonMass, fPhotonQt, fPhotonAlpha, fPhotonRadius, fPhotonCosPA, fPhotonDCADau, fPhotonDCANegPV, fPhotonDCAPosPV, fPhotonZconv, fLambdaPt, fLambdaMass, fLambdaQt, fLambdaAlpha, fLambdaRadius, fLambdaCosPA, fLambdaDCADau, fLambdaDCANegPV, fLambdaDCAPosPV, fIsSigma, gamma.gammaBDTOutput(), lambda.lambdaBDTOutput());
+        v0MLSigmas(fSigmapT, fSigmaMass, fPhotonPt, fPhotonMass, fPhotonQt, fPhotonAlpha, fPhotonRadius, fPhotonCosPA, fPhotonDCADau, fPhotonDCANegPV, fPhotonDCAPosPV, fPhotonZconv, fLambdaPt, fLambdaMass, fLambdaQt, fLambdaAlpha, fLambdaRadius, fLambdaCosPA, fLambdaDCADau, fLambdaDCANegPV, fLambdaDCAPosPV, gamma.gammaBDTOutput(), lambda.lambdaBDTOutput());
 
       }
     }
