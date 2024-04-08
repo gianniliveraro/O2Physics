@@ -68,6 +68,12 @@ OnnxModel antilambda_bdt;
 OnnxModel gamma_bdt;
 OnnxModel kzeroshort_bdt;
 
+// For original data loops
+using V0OriginalDatas = soa::Join<aod::V0Indices, aod::V0Cores>;
+
+// For derived data analysis
+using V0DerivedDatas = soa::Join<aod::V0Cores, aod::V0Extras, aod::V0CollRefs>;
+
 std::map<std::string, std::string> metadata;
 std::map<std::string, std::string> headers;
 
@@ -99,18 +105,12 @@ struct lambdakzeromlselection{
   // Axis	
   // base properties
   ConfigurableAxis vertexZ{"vertexZ", {30, -15.0f, 15.0f}, ""};
-  ConfigurableAxis MLProb{"MLOutput", {100, 0.0f, 1.0f}, ""};
-  ConfigurableAxis axisCounter{"GroundTruthCounter", {2, 0, +2}, ""};
 
   int nCandidates = 0;
   void init(InitContext const&)
   {
     // Histograms
     histos.add("hEventVertexZ", "hEventVertexZ", kTH1F, {vertexZ});
-    histos.add("hMLOutputLambdaSignal", "hMLOutputLambdaSignal", kTH1F, {MLProb});
-    histos.add("hMLOutputGammaSignal", "hMLOutputGammaSignal", kTH1F, {MLProb});
-    histos.add("TrueLambdaCounter", "TrueLambdaCounter", kTH1F, {axisCounter});
-    histos.add("TrueGammaCounter", "TrueGammaCounter", kTH1F, {axisCounter});
 
     ccdb->setURL(ccdbUrl.value);
     // Retrieve the model from CCDB 
@@ -171,15 +171,11 @@ struct lambdakzeromlselection{
     float dcapostopv;
     float dcanegtopv;
     float dcaV0daughters;
-    bool isLambda;
-    bool isAntiLambda;
-    bool isGamma;
-    bool isKZeroShort;
   } Candidate;
 
   // Process candidate and store properties in object
   template <typename TV0Object>
-  bool processCandidate(TV0Object const& cand)
+  void processCandidate(TV0Object const& cand)
   {    
     Candidate.LambdaMass = cand.mLambda();
     Candidate.AntiLambdaMass = cand.mAntiLambda();
@@ -194,57 +190,37 @@ struct lambdakzeromlselection{
     Candidate.dcanegtopv = cand.dcanegtopv();
     Candidate.dcaV0daughters = cand.dcaV0daughters();
 
-    if (fIsMC){
-    Candidate.isLambda = (cand.pdgCode()==3122);
-    Candidate.isAntiLambda = (cand.pdgCode()==-3122);
-    Candidate.isGamma = (cand.pdgCode()==22);
-    Candidate.isKZeroShort = (cand.pdgCode()==310);
-    }
-    return true;
+    std::vector<float> inputFeatures{Candidate.pT, Candidate.qt, 
+                                      Candidate.alpha, Candidate.v0radius, 
+                                      Candidate.v0cosPA, Candidate.dcaV0daughters, 
+                                      Candidate.dcapostopv, Candidate.dcanegtopv};
+
+    // calculate classifier
+    float* LambdaProbability = lambda_bdt.evalModel(inputFeatures);
+    float* GammaProbability = gamma_bdt.evalModel(inputFeatures);
+    //float* AntiLambdaProbability = antilambda_bdt.evalModel(inputFeatures); // WIP
+    //float* KZeroShortProbability = kzeroshort_bdt.evalModel(inputFeatures); // WIP
+
+    v0MLOutputs(LambdaProbability[1], GammaProbability[1]);
   }
 
-  void process(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MCDatas> const& v0s)
+  void processDerivedData(aod::StraCollision const& coll, V0DerivedDatas const& v0s)
   {
     histos.fill(HIST("hEventVertexZ"), coll.posZ());
-    for (auto& cand: v0s){ // looping over lambdas 
-
-      if(!processCandidate(cand))
-        continue;
-
-      nCandidates++;
-      if (nCandidates % 50000 == 0) {
-        LOG(info) << "Candidates processed: " << nCandidates;
-      }
-
-      // ['fPt', 'fQt', 'fAlpha', 'fRadius', 'fCosPA', 'fDCADau', 'fDCANegPV', 'fDCAPosPV']
-      // Perform ML selections 
-      std::vector<float> inputFeatures{Candidate.pT, Candidate.qt, 
-                                        Candidate.alpha, Candidate.v0radius, 
-                                        Candidate.v0cosPA, Candidate.dcaV0daughters, 
-                                        Candidate.dcapostopv, Candidate.dcanegtopv};
-
-      // Retrieve models output
-      float* LambdaProbability = lambda_bdt.evalModel(inputFeatures);
-      float* GammaProbability = gamma_bdt.evalModel(inputFeatures);
-      //float* AntiLambdaProbability = antilambda_bdt.evalModel(inputFeatures); // it should be enable when we train a antilambda model
-      //float* KZeroShortProbability = kzeroshort_bdt.evalModel(inputFeatures); // it should be enable when we train a kzeroshort model
-      
-
-      if (fIsMC){
-        histos.fill(HIST("TrueLambdaCounter"), Candidate.isLambda);
-        histos.fill(HIST("TrueGammaCounter"), Candidate.isGamma);
-        if (Candidate.isLambda) histos.fill(HIST("hMLOutputLambdaSignal"), LambdaProbability[1]);
-        if (Candidate.isGamma) histos.fill(HIST("hMLOutputGammaSignal"), GammaProbability[1]);
-      }
-      else{
-        // // Fill BDT score histograms
-        histos.fill(HIST("hMLOutputLambdaSignal"), LambdaProbability[1]);
-        histos.fill(HIST("hMLOutputGammaSignal"), GammaProbability[1]);
-      }
-      
-      v0MLOutputs(LambdaProbability[1], GammaProbability[1]);
+    for (auto& v0: v0s){ // looping over lambdas 
+      processCandidate(v0);
     }
   }
+  void processStandardData(aod::Collision const& coll, V0OriginalDatas const& v0s)
+  {
+    histos.fill(HIST("hEventVertexZ"), coll.posZ());
+    for (auto& v0: v0s){ // looping over lambdas 
+      processCandidate(v0);
+    }
+  }
+
+  PROCESS_SWITCH(lambdakzeromlselection, processStandardData, "Process standard data", true);
+  PROCESS_SWITCH(lambdakzeromlselection, processDerivedData, "Process derived data", false);
 };
 
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
