@@ -12,11 +12,20 @@
 add_subdirectory(QC)
 add_subdirectory(converters)
 
+add_subdirectory(Nuspex)
+add_subdirectory(Strangeness)
+add_subdirectory(Resonances)
+
 # General purpose
+o2physics_add_dpl_workflow(epvector
+    SOURCES epvector.cxx
+    PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore O2::DetectorsVertexing
+    COMPONENT_NAME Analysis)
+
 o2physics_add_dpl_workflow(tpcpid
-                    SOURCES lfTPCPID.cxx
-                    PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore
-                    COMPONENT_NAME Analysis)
+    SOURCES lfTPCPID.cxx
+    PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore
+    COMPONENT_NAME Analysis)
 
 o2physics_add_dpl_workflow(zdcsp
                     SOURCES zdcSP.cxx
