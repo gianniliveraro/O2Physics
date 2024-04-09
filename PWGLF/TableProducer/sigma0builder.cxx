@@ -23,6 +23,7 @@
 #include "PWGLF/DataModel/LFStrangenessTables.h"
 #include "PWGLF/DataModel/LFStrangenessPIDTables.h"
 #include "PWGLF/DataModel/LFStrangenessMLTables.h"
+#include "PWGLF/DataModel/LFSigmaTables.h"
 #include "Common/Core/TrackSelection.h"
 #include "Common/DataModel/TrackSelectionTables.h"
 #include "Common/DataModel/EventSelection.h"
@@ -120,7 +121,7 @@ struct sigma0builder{
    }
  }
 
-  void processMonteCarlo(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MCDatas, aod::V0MLOutputs> const& v0s)
+  void processMonteCarlo(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MCDatas, aod::V0MLSelections> const& v0s)
   {
     int SigmaCounter = 0;
     int GammaCounter = 0;
@@ -180,7 +181,7 @@ struct sigma0builder{
     histos.fill(HIST("hNLambdaCandidatesMC"), LambdaCounter);
   }
 
-    void processRealData(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MLOutputs> const& v0s)
+    void processRealData(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MLSelections> const& v0s)
   {
     int SigmaCounter = 0;
 

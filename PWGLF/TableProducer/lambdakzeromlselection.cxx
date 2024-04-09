@@ -78,7 +78,7 @@ std::map<std::string, std::string> metadata;
 std::map<std::string, std::string> headers;
 
 struct lambdakzeromlselection{
-  Produces<aod::V0MLOutputs> v0MLOutputs; // optionally aggregate information from ML output for posterior analysis (derived data)
+  Produces<aod::V0MLSelections> v0MLSelections; // optionally aggregate information from ML output for posterior analysis (derived data)
   HistogramRegistry histos{"Histos", {}, OutputObjHandlingPolicy::AnalysisObject};
 
   // ML inference
@@ -157,43 +157,14 @@ struct lambdakzeromlselection{
     }
   }
 
-  // Helper struct to pass v0 information
-  struct {
-    float LambdaMass;
-    float AntiLambdaMass;
-    float GammaMass;
-    float KZeroShortMass;
-    float pT;
-    float qt;
-    float alpha;
-    float v0radius;
-    float v0cosPA;
-    float dcapostopv;
-    float dcanegtopv;
-    float dcaV0daughters;
-  } Candidate;
-
   // Process candidate and store properties in object
   template <typename TV0Object>
   void processCandidate(TV0Object const& cand)
   {    
-    Candidate.LambdaMass = cand.mLambda();
-    Candidate.AntiLambdaMass = cand.mAntiLambda();
-    Candidate.GammaMass = cand.mGamma();
-    Candidate.KZeroShortMass = cand.mK0Short();
-    Candidate.pT = cand.pt();
-    Candidate.qt = cand.qtarm();
-    Candidate.alpha = cand.alpha();
-    Candidate.v0radius = cand.v0radius();
-    Candidate.v0cosPA = cand.v0cosPA();
-    Candidate.dcapostopv = cand.dcapostopv();
-    Candidate.dcanegtopv = cand.dcanegtopv();
-    Candidate.dcaV0daughters = cand.dcaV0daughters();
-
-    std::vector<float> inputFeatures{Candidate.pT, Candidate.qt, 
-                                      Candidate.alpha, Candidate.v0radius, 
-                                      Candidate.v0cosPA, Candidate.dcaV0daughters, 
-                                      Candidate.dcapostopv, Candidate.dcanegtopv};
+    std::vector<float> inputFeatures{cand.pt(), static_cast<float>(cand.qtarm()), 
+                                     cand.alpha(), cand.v0radius(), 
+                                     cand.v0cosPA(), cand.dcaV0daughters(), 
+                                     cand.dcapostopv(), cand.dcanegtopv()};
 
     // calculate classifier
     float* LambdaProbability = lambda_bdt.evalModel(inputFeatures);
@@ -201,7 +172,7 @@ struct lambdakzeromlselection{
     //float* AntiLambdaProbability = antilambda_bdt.evalModel(inputFeatures); // WIP
     //float* KZeroShortProbability = kzeroshort_bdt.evalModel(inputFeatures); // WIP
 
-    v0MLOutputs(LambdaProbability[1], GammaProbability[1]);
+    v0MLSelections(LambdaProbability[1], GammaProbability[1]);
   }
 
   void processDerivedData(aod::StraCollision const& coll, V0DerivedDatas const& v0s)
