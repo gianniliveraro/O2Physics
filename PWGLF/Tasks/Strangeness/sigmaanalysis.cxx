@@ -268,7 +268,7 @@ struct sigmaanalysis{
     histos.fill(HIST("hNSigmaCandidatesMC"), SigmaCounter);
   }
 
-    void processRealData(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MLSelections> const& v0s)
+    void processRealData(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0LambdaMLScores, aod::V0GammaMLScores> const& v0s)
   {
     int SigmaCounter = 0;
 
@@ -288,8 +288,8 @@ struct sigmaanalysis{
         histos.fill(HIST("h2dPhotonMassVsPt"), sigmaCandidate.pT, gamma.mGamma());
         histos.fill(HIST("h2dSigmaMassVsPt"), sigmaCandidate.pT, sigmaCandidate.mass);
 
-        histos.fill(HIST("hMLOutputLambda"), lambda.lambdaBDTOutput());
-        histos.fill(HIST("hMLOutputGamma"), gamma.gammaBDTOutput());
+        histos.fill(HIST("hMLOutputLambda"), lambda.lambdaBDTScore());
+        histos.fill(HIST("hMLOutputGamma"), gamma.gammaBDTScore());
 
       }
     }

@@ -96,11 +96,11 @@ struct sigma0builder{
   bool processSigmaCandidate(TCollision const& collision, TV0Object const& lambda, TV0Object const& gamma)
   {    
     // Gamma selection:
-    if( gamma.gammaBDTOutput() <= Gamma_MLThreshold) 
+    if( gamma.gammaBDTScore() <= Gamma_MLThreshold) 
       return false;
 
     // Lambda selection:
-    if( lambda.lambdaBDTOutput() <= Lambda_MLThreshold) 
+    if( lambda.lambdaBDTScore() <= Lambda_MLThreshold) 
       return false;
       
     std::array<float, 3> pVecPhotons{gamma.px(), gamma.py(), gamma.pz()};
@@ -121,7 +121,7 @@ struct sigma0builder{
    }
  }
 
-  void processMonteCarlo(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MCDatas, aod::V0MLSelections> const& v0s)
+  void processMonteCarlo(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MCDatas, aod::V0LambdaMLScores, aod::V0GammaMLScores> const& v0s)
   {
     int SigmaCounter = 0;
     int GammaCounter = 0;
@@ -172,7 +172,7 @@ struct sigma0builder{
         float fLambdaDCAPosPV = lambda.dcapostopv();
 
         // Filling TTree for ML analysis
-        v0MLMCSigmas(fSigmapT, fSigmaMass, fPhotonPt, fPhotonMass, fPhotonQt, fPhotonAlpha, fPhotonRadius, fPhotonCosPA, fPhotonDCADau, fPhotonDCANegPV, fPhotonDCAPosPV, fPhotonZconv, fLambdaPt, fLambdaMass, fLambdaQt, fLambdaAlpha, fLambdaRadius, fLambdaCosPA, fLambdaDCADau, fLambdaDCANegPV, fLambdaDCAPosPV, fIsSigma, gamma.gammaBDTOutput(), lambda.lambdaBDTOutput());
+        v0MLMCSigmas(fSigmapT, fSigmaMass, fPhotonPt, fPhotonMass, fPhotonQt, fPhotonAlpha, fPhotonRadius, fPhotonCosPA, fPhotonDCADau, fPhotonDCANegPV, fPhotonDCAPosPV, fPhotonZconv, fLambdaPt, fLambdaMass, fLambdaQt, fLambdaAlpha, fLambdaRadius, fLambdaCosPA, fLambdaDCADau, fLambdaDCANegPV, fLambdaDCAPosPV, fIsSigma, gamma.gammaBDTScore(), lambda.lambdaBDTScore());
         histos.fill(HIST("InvMassSigmaMC"), fSigmaMass);
       }
     }
@@ -181,7 +181,7 @@ struct sigma0builder{
     histos.fill(HIST("hNLambdaCandidatesMC"), LambdaCounter);
   }
 
-    void processRealData(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MLSelections> const& v0s)
+    void processRealData(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0LambdaMLScores, aod::V0GammaMLScores> const& v0s)
   {
     int SigmaCounter = 0;
 
@@ -224,7 +224,7 @@ struct sigma0builder{
         float fLambdaDCAPosPV = lambda.dcapostopv();
 
         // Filling TTree for ML analysis
-        v0MLSigmas(fSigmapT, fSigmaMass, fPhotonPt, fPhotonMass, fPhotonQt, fPhotonAlpha, fPhotonRadius, fPhotonCosPA, fPhotonDCADau, fPhotonDCANegPV, fPhotonDCAPosPV, fPhotonZconv, fLambdaPt, fLambdaMass, fLambdaQt, fLambdaAlpha, fLambdaRadius, fLambdaCosPA, fLambdaDCADau, fLambdaDCANegPV, fLambdaDCAPosPV, gamma.gammaBDTOutput(), lambda.lambdaBDTOutput());
+        v0MLSigmas(fSigmapT, fSigmaMass, fPhotonPt, fPhotonMass, fPhotonQt, fPhotonAlpha, fPhotonRadius, fPhotonCosPA, fPhotonDCADau, fPhotonDCANegPV, fPhotonDCAPosPV, fPhotonZconv, fLambdaPt, fLambdaMass, fLambdaQt, fLambdaAlpha, fLambdaRadius, fLambdaCosPA, fLambdaDCADau, fLambdaDCANegPV, fLambdaDCAPosPV, gamma.gammaBDTScore(), lambda.lambdaBDTScore());
 
       }
     }

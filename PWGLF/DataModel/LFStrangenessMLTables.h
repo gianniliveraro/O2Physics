@@ -66,18 +66,20 @@ DECLARE_SOA_TABLE(V0MLCandidates, "AOD", "V0MLCANDIDATES",
 
 namespace V0MLSelection
 {
-DECLARE_SOA_COLUMN(LambdaBDTOutput, lambdaBDTOutput, float);
-//DECLARE_SOA_COLUMN(AntiLambdaBDTOutput, bdtoutput, float); // should be activated when we train a AntiLambda BDT model
-DECLARE_SOA_COLUMN(GammaBDTOutput, gammaBDTOutput, float);
-//DECLARE_SOA_COLUMN(KZeroShortBDTOutput, bdtoutput, float); // should be activated when we train a KZeroShort BDT model
-} // namespace V0MLOutput
+DECLARE_SOA_COLUMN(GammaBDTScore, gammaBDTScore, float);
+DECLARE_SOA_COLUMN(LambdaBDTScore, lambdaBDTScore, float);
+DECLARE_SOA_COLUMN(AntiLambdaBDTScore, antiLambdaBDTScore, float); 
+DECLARE_SOA_COLUMN(K0ShortBDTScore, k0ShortBDTScore, float);
+} // namespace V0MLSelection
 
-DECLARE_SOA_TABLE(V0MLSelections, "AOD", "V0MLSELECTIONS",
-				  V0MLSelection::LambdaBDTOutput,
-				  //V0MLSelection::AntiLambdaBDTOutput,
-				  //V0MLSelection::KZeroShortBDTOutput,
-				  V0MLSelection::GammaBDTOutput);
-
+DECLARE_SOA_TABLE(V0GammaMLScores, "AOD", "V0GaMLScores",
+				  V0MLSelection::GammaBDTScore);
+DECLARE_SOA_TABLE(V0LambdaMLScores, "AOD", "V0LaMLScores",
+				  V0MLSelection::LambdaBDTScore);
+DECLARE_SOA_TABLE(V0AntiLambdaMLScores, "AOD", "V0ALaMLScores",
+				  V0MLSelection::AntiLambdaBDTScore);
+DECLARE_SOA_TABLE(V0K0ShortMLScores, "AOD", "V0K0MLScores",
+				  V0MLSelection::K0ShortBDTScore);
 } // namespace o2::aod
 
 #endif // PWGLF_DATAMODEL_LFSTRANGENESSMLTABLES_H_

@@ -78,7 +78,8 @@ std::map<std::string, std::string> metadata;
 std::map<std::string, std::string> headers;
 
 struct lambdakzeromlselection{
-  Produces<aod::V0MLSelections> v0MLSelections; // optionally aggregate information from ML output for posterior analysis (derived data)
+  Produces<aod::V0GammaMLScores> gammaMLSelections; // optionally aggregate information from ML output for posterior analysis (derived data)
+  Produces<aod::V0LambdaMLScores> lambdaMLSelections; // optionally aggregate information from ML output for posterior analysis (derived data)
   HistogramRegistry histos{"Histos", {}, OutputObjHandlingPolicy::AnalysisObject};
 
   // ML inference
@@ -172,7 +173,8 @@ struct lambdakzeromlselection{
     //float* AntiLambdaProbability = antilambda_bdt.evalModel(inputFeatures); // WIP
     //float* KZeroShortProbability = kzeroshort_bdt.evalModel(inputFeatures); // WIP
 
-    v0MLSelections(LambdaProbability[1], GammaProbability[1]);
+    gammaMLSelections(GammaProbability[1]);
+    lambdaMLSelections(LambdaProbability[1]);
   }
 
   void processDerivedData(aod::StraCollision const& coll, V0DerivedDatas const& v0s)
