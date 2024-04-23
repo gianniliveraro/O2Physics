@@ -118,6 +118,9 @@ struct strangederivedbuilder {
   Produces<aod::GeK0Short> geK0Short;
   Produces<aod::GeLambda> geLambda;
   Produces<aod::GeAntiLambda> geAntiLambda;
+  Produces<aod::GeGamma> geGamma;
+  Produces<aod::GeSigma0> geSigma0;
+  Produces<aod::GeAntiSigma0> geAntiSigma0;
   Produces<aod::GeXiMinus> geXiMinus;
   Produces<aod::GeXiPlus> geXiPlus;
   Produces<aod::GeOmegaMinus> geOmegaMinus;
@@ -178,6 +181,9 @@ struct strangederivedbuilder {
   std::vector<uint32_t> genK0Short;
   std::vector<uint32_t> genLambda;
   std::vector<uint32_t> genAntiLambda;
+  std::vector<uint32_t> genGamma;
+  std::vector<uint32_t> genSigma0;
+  std::vector<uint32_t> genAntiSigma0;
   std::vector<uint32_t> genXiMinus;
   std::vector<uint32_t> genXiPlus;
   std::vector<uint32_t> genOmegaMinus;
@@ -226,6 +232,9 @@ struct strangederivedbuilder {
       genK0Short.resize(hBinFinder->GetNcells(), 0);
       genLambda.resize(hBinFinder->GetNcells(), 0);
       genAntiLambda.resize(hBinFinder->GetNcells(), 0);
+      genGamma.resize(hBinFinder->GetNcells(), 0);
+      genSigma0.resize(hBinFinder->GetNcells(), 0);
+      genAntiSigma0.resize(hBinFinder->GetNcells(), 0);
       genXiMinus.resize(hBinFinder->GetNcells(), 0);
       genXiPlus.resize(hBinFinder->GetNcells(), 0);
       genOmegaMinus.resize(hBinFinder->GetNcells(), 0);
@@ -694,6 +703,9 @@ struct strangederivedbuilder {
     std::fill(genK0Short.begin(), genK0Short.end(), 0);
     std::fill(genLambda.begin(), genLambda.end(), 0);
     std::fill(genAntiLambda.begin(), genAntiLambda.end(), 0);
+    std::fill(genGamma.begin(), genGamma.end(), 0);
+    std::fill(genSigma0.begin(), genSigma0.end(), 0);
+    std::fill(genAntiSigma0.begin(), genAntiSigma0.end(), 0);
     std::fill(genXiMinus.begin(), genXiMinus.end(), 0);
     std::fill(genXiPlus.begin(), genXiPlus.end(), 0);
     std::fill(genOmegaMinus.begin(), genOmegaMinus.end(), 0);
@@ -716,6 +728,12 @@ struct strangederivedbuilder {
             genLambda[binNumber]++;
           if (mcp.pdgCode() == -3122)
             genAntiLambda[binNumber]++;
+          if (mcp.pdgCode() == 22)
+            genGamma[binNumber]++;
+          if (mcp.pdgCode() == 3212)
+            genSigma0[binNumber]++;
+          if (mcp.pdgCode() == -3212)
+            genAntiSigma0[binNumber]++;
           if (mcp.pdgCode() == 3312)
             genXiMinus[binNumber]++;
           if (mcp.pdgCode() == -3312)
@@ -732,6 +750,9 @@ struct strangederivedbuilder {
     geK0Short(genK0Short);
     geLambda(genLambda);
     geAntiLambda(genAntiLambda);
+    geGamma(genGamma);
+    geSigma0(genSigma0);
+    geAntiSigma0(genAntiSigma0);
     geXiMinus(genXiMinus);
     geXiPlus(genXiPlus);
     geOmegaMinus(genOmegaMinus);

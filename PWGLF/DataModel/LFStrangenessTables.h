@@ -252,6 +252,9 @@ DECLARE_SOA_COLUMN(PzNegMC, pzNegMC, float);                    //! V0 positive 
 DECLARE_SOA_COLUMN(GeneratedK0Short, generatedK0Short, std::vector<uint32_t>);       //! K0Short binned generated data
 DECLARE_SOA_COLUMN(GeneratedLambda, generatedLambda, std::vector<uint32_t>);         //! Lambda binned generated data
 DECLARE_SOA_COLUMN(GeneratedAntiLambda, generatedAntiLambda, std::vector<uint32_t>); //! AntiLambda binned generated data
+DECLARE_SOA_COLUMN(GeneratedGamma, generatedGamma, std::vector<uint32_t>); //! Gamma binned generated data
+DECLARE_SOA_COLUMN(GeneratedSigma0, generatedSigma0, std::vector<uint32_t>); //! Sigma0 binned generated data
+DECLARE_SOA_COLUMN(GeneratedAntiSigma0, generatedAntiSigma0, std::vector<uint32_t>); //! AntiSigma0 binned generated data
 
 //______________________________________________________
 // EXPRESSION COLUMNS
@@ -564,6 +567,9 @@ DECLARE_SOA_TABLE(V0MCCollRefs, "AOD", "V0MCCOLLREF", //! refers MC candidate ba
 DECLARE_SOA_TABLE(GeK0Short, "AOD", "GeK0Short", v0data::GeneratedK0Short);
 DECLARE_SOA_TABLE(GeLambda, "AOD", "GeLambda", v0data::GeneratedLambda);
 DECLARE_SOA_TABLE(GeAntiLambda, "AOD", "GeAntiLambda", v0data::GeneratedAntiLambda);
+DECLARE_SOA_TABLE(GeGamma, "AOD", "GeGamma", v0data::GeneratedGamma);
+DECLARE_SOA_TABLE(GeSigma0, "AOD", "GeSigma0", v0data::GeneratedSigma0);
+DECLARE_SOA_TABLE(GeAntiSigma0, "AOD", "GeAntiSigma0", v0data::GeneratedAntiSigma0);
 
 DECLARE_SOA_TABLE(V0MCMothers, "AOD", "V0MCMOTHER", //! optional table for MC mothers
                   o2::soa::Index<>, v0data::MotherMCPartId);
