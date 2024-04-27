@@ -121,8 +121,8 @@ struct lambdakzeroMLSelectionTreeCreator {
     int negITSCls;
     uint32_t posITSClSize;
     uint32_t negITSClSize;
-    float posTPCRows;
-    float negTPCRows;
+    uint8_t posTPCRows;
+    uint8_t negTPCRows;
     float posTPCSigmaPi;
     float negTPCSigmaPi;
     float posTPCSigmaPr;
