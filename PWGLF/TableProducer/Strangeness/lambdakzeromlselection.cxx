@@ -77,6 +77,9 @@ struct lambdakzeromlselection {
 
   Produces<aod::V0GammaMLScores> gammaMLSelections;   // optionally aggregate information from ML output for posterior analysis (derived data)
   Produces<aod::V0LambdaMLScores> lambdaMLSelections; // optionally aggregate information from ML output for posterior analysis (derived data)
+  Produces<aod::AntiLambdaBDTScore> antiLambdaMLSelections; // optionally aggregate information from ML output for posterior analysis (derived data)
+  Produces<aod::K0ShortBDTScore> kzeroShortMLSelections; // optionally aggregate information from ML output for posterior analysis (derived data)
+
   HistogramRegistry histos{"Histos", {}, OutputObjHandlingPolicy::AnalysisObject};
 
   // ML inference
@@ -92,7 +95,7 @@ struct lambdakzeromlselection {
   Configurable<std::vector<int>> Kine_SelMap{"Kine_SelMap", std::vector<int>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, "Mask to select basic kinematic features for ML Inference"};
 
   //// Order: Z, V0radius, PA, DCApostopv, DCAnegtopv, DCAV0daughters, DCAv0topv, PsiPair
-  Configurable<std::vector<int>> Topo_SelMap{"Topo_SelMap", std::vector<int>{0, 1, 1, 1, 1, 1, 0, 0}, "Mask to select basic topological features for ML Inference"};
+  Configurable<std::vector<int>> Topo_SelMap{"Topo_SelMap", std::vector<int>{0, 1, 1, 1, 1, 1, 1, 0}, "Mask to select basic topological features for ML Inference"};
 
   //// Casting 
   std::vector<int> CastKine_SelMap, CastTopo_SelMap, Feature_SelMask;
@@ -212,14 +215,23 @@ struct lambdakzeromlselection {
     // Apply mask to select features
     std::vector<float> inputFeatures = extractSelectedElements(base_features, Feature_SelMask);
 
-    // calculate classifier
-    float* LambdaProbability = lambda_bdt.evalModel(inputFeatures);
-    float* GammaProbability = gamma_bdt.evalModel(inputFeatures);
-    // float* AntiLambdaProbability = antilambda_bdt.evalModel(inputFeatures); // WIP
-    // float* KZeroShortProbability = kzeroshort_bdt.evalModel(inputFeatures); // WIP
-
-    gammaMLSelections(GammaProbability[1]);
-    lambdaMLSelections(LambdaProbability[1]);
+    // calculate classifier output
+    if (PredictLambda){
+      float* LambdaProbability = lambda_bdt.evalModel(inputFeatures);
+      lambdaMLSelections(LambdaProbability[1]);
+    }
+    if (PredictGamma){
+      float* GammaProbability = gamma_bdt.evalModel(inputFeatures);
+      gammaMLSelections(GammaProbability[1]);
+    }
+    if (PredictAntiLambda){
+      float* AntiLambdaProbability = antilambda_bdt.evalModel(inputFeatures);
+      antiLambdaMLSelections(AntiLambdaProbability[1]);
+    }
+    if (PredictKZeroShort){
+      float* KZeroShortProbability = kzeroshort_bdt.evalModel(inputFeatures);
+      kzeroShortMLSelections(KZeroShortProbability[1]);
+    }
   }
 
   void processDerivedData(aod::StraCollision const& coll, V0DerivedDatas const& v0s)
