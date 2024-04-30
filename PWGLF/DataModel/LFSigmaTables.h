@@ -52,8 +52,9 @@ DECLARE_SOA_COLUMN(LambdaCosPA, lambdaCosPA, float);
 DECLARE_SOA_COLUMN(LambdaDCADau, lambdaDCADau, float);
 DECLARE_SOA_COLUMN(LambdaDCANegPV, lambdaDCANegPV, float);
 DECLARE_SOA_COLUMN(LambdaDCAPosPV, lambdaDCAPosPV, float);
-DECLARE_SOA_COLUMN(GammaProbability, gammaProbability, float);
-DECLARE_SOA_COLUMN(LambdaProbability, lambdaProbability, float);
+DECLARE_SOA_COLUMN(GammaBDTScore, gammaBDTScore, float);
+DECLARE_SOA_COLUMN(LambdaBDTScore, lambdaBDTScore, float);
+DECLARE_SOA_COLUMN(AntiLambdaBDTScore, antilambdaBDTScore, float);
 
 } // namespace v0SigmaCandidate
 
@@ -82,8 +83,9 @@ DECLARE_SOA_TABLE(V0SigmaCandidates, "AOD", "V0SIGMAS",
                   v0SigmaCandidate::LambdaDCADau,
                   v0SigmaCandidate::LambdaDCANegPV,
                   v0SigmaCandidate::LambdaDCAPosPV,
-                  v0SigmaCandidate::GammaProbability,
-                  v0SigmaCandidate::LambdaProbability);
+                  v0SigmaCandidate::GammaBDTScore,
+                  v0SigmaCandidate::LambdaBDTScore,
+                  v0SigmaCandidate::AntiLambdaBDTScore);
 
 // for MC data
 namespace v0SigmaMCCandidate

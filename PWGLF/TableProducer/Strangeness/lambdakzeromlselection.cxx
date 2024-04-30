@@ -77,8 +77,8 @@ struct lambdakzeromlselection {
 
   Produces<aod::V0GammaMLScores> gammaMLSelections;   // optionally aggregate information from ML output for posterior analysis (derived data)
   Produces<aod::V0LambdaMLScores> lambdaMLSelections; // optionally aggregate information from ML output for posterior analysis (derived data)
-  Produces<aod::AntiLambdaBDTScore> antiLambdaMLSelections; // optionally aggregate information from ML output for posterior analysis (derived data)
-  Produces<aod::K0ShortBDTScore> kzeroShortMLSelections; // optionally aggregate information from ML output for posterior analysis (derived data)
+  Produces<aod::V0AntiLambdaMLScores> antiLambdaMLSelections; // optionally aggregate information from ML output for posterior analysis (derived data)
+  Produces<aod::V0K0ShortMLScores> kzeroShortMLSelections; // optionally aggregate information from ML output for posterior analysis (derived data)
 
   HistogramRegistry histos{"Histos", {}, OutputObjHandlingPolicy::AnalysisObject};
 

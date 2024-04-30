@@ -55,11 +55,36 @@ struct sigma0builder {
 
   HistogramRegistry histos{"Histos", {}, OutputObjHandlingPolicy::AnalysisObject};
 
-  Configurable<float> Gamma_MLThreshold{"Gamma_MLThreshold", 0.1, "Decision Threshold value to select gammas of sigma0 candidates"};
-  Configurable<float> Lambda_MLThreshold{"Lambda_MLThreshold", 0.1, "Decision Threshold value to select lambdas of sigma0 candidates"};
+  // Analysis strategy:
+  Configurable<bool> fUseMLSel{"fUseMLSel", true, "Flag to use ML selection. If False, the standard selection is applied."}; 
+
+  // For ML Selection
+  Configurable<float> Gamma_MLThreshold{"Gamma_MLThreshold", 0.1, "Decision Threshold value to select gammas"};
+  Configurable<float> Lambda_MLThreshold{"Lambda_MLThreshold", 0.1, "Decision Threshold value to select lambdas"};
+  Configurable<float> AntiLambda_MLThreshold{"AntiLambda_MLThreshold", 0.1, "Decision Threshold value to select antilambdas"};
+
+  // For standard approach:
+  //// Lambda criteria:
+  Configurable<float> LambdaDauPseudoRap{"LambdaDauPseudoRap", 1.0, "Max pseudorapidity of daughter tracks"};
+  Configurable<float> Lambdadcanegtopv{"Lambdadcanegtopv", .01, "min DCA Neg To PV (cm)"};
+  Configurable<float> Lambdadcapostopv{"Lambdadcapostopv", .01, "min DCA Pos To PV (cm)"};
+  Configurable<float> Lambdadcav0dau{"Lambdadcav0dau", 2.5, "Max DCA V0 Daughters (cm)"};
+  Configurable<float> LambdaMinv0radius{"LambdaMinv0radius", 0.1, "Min V0 radius (cm)"};
+  Configurable<float> LambdaMaxv0radius{"LambdaMaxv0radius", 200, "Max V0 radius (cm)"};
+  Configurable<float> LambdaWindow{"LambdaWindow", 0.01, "Mass window around expected (in GeV/c2)"};
+
+  //// Photon criteria:
+  Configurable<float> PhotonDauPseudoRap{"PhotonDauPseudoRap", 1.0, "Max pseudorapidity of daughter tracks"};
+  Configurable<float> Photondcadautopv{"Photondcadautopv", 0.01, "Min DCA daughter To PV (cm)"};
+  Configurable<float> Photondcav0dau{"Photondcav0dau", 3.0, "Max DCA V0 Daughters (cm)"};  
+  Configurable<float> PhotonMinRadius{"PhotonMinRadius", 0.5, "Min photon conversion radius (cm)"};
+  Configurable<float> PhotonMaxRadius{"PhotonMaxRadius", 250, "Max photon conversion radius (cm)"};
+  Configurable<float> PhotonMaxMass{"PhotonMaxMass", 0.2, "Max photon mass (GeV/c^{2})"};
+  
   // Axis
   // base properties
   ConfigurableAxis vertexZ{"vertexZ", {30, -15.0f, 15.0f}, ""};
+
   // Invariant Mass
   ConfigurableAxis axisSigmaMass{"axisSigmaMass", {200, 1.16f, 1.23f}, "M_{#Sigma^{0}} (GeV/c^{2})"};
 
@@ -67,7 +92,6 @@ struct sigma0builder {
   {
     // Event counter
     histos.add("hEventVertexZ", "hEventVertexZ", kTH1F, {vertexZ});
-    histos.add("hEventVertexZMC", "hEventVertexZMC", kTH1F, {vertexZ});
   }
 
   // Helper struct to pass v0 information
@@ -80,14 +104,44 @@ struct sigma0builder {
   template <typename TV0Object, typename TCollision>
   bool processSigmaCandidate(TCollision const&, TV0Object const& lambda, TV0Object const& gamma)
   {
-    // Gamma selection:
-    if (gamma.gammaBDTScore() <= Gamma_MLThreshold)
+    if ((lambda.v0Type()==0) || (gamma.v0Type()==0))
       return false;
 
-    // Lambda selection:
-    if (lambda.lambdaBDTScore() <= Lambda_MLThreshold)
-      return false;
+    if (fUseMLSel){
+      // Gamma selection:
+      if (gamma.gammaBDTScore() <= Gamma_MLThreshold)
+        return false;
 
+      // Lambda and AntiLambda selection
+      if ((lambda.lambdaBDTScore() <= Lambda_MLThreshold) && (lambda.antiLambdaBDTScore() <= AntiLambda_MLThreshold))
+          return false;
+    }
+    else{
+      // Standard selection
+      // Gamma selection criteria:
+    
+      if (TMath::Abs(gamma.mGamma()) > PhotonMaxMass)
+        return false;
+      if ((TMath::Abs(gamma.negativeeta()) > PhotonDauPseudoRap) || (TMath::Abs(gamma.positiveeta()) > PhotonDauPseudoRap))
+        return false;
+      if ((gamma.dcapostopv() > Photondcadautopv) || ( gamma.dcanegtopv() > Photondcadautopv))
+        return false;
+      if (gamma.dcaV0daughters() > Photondcav0dau)
+        return false;
+      if ((gamma.v0radius() < PhotonMinRadius) || (gamma.v0radius() > PhotonMaxRadius))
+        return false;
+
+      if (TMath::Abs(lambda.mLambda() - 1.115683) > LambdaWindow)
+        return false;
+      if ((TMath::Abs(lambda.negativeeta()) > LambdaDauPseudoRap) || (TMath::Abs(lambda.positiveeta()) > LambdaDauPseudoRap))
+        return false;
+      if ((lambda.dcapostopv() < Lambdadcapostopv) || (lambda.dcanegtopv() < Lambdadcanegtopv))
+        return false;
+      if ((lambda.v0radius() < LambdaMinv0radius) || (lambda.v0radius() > LambdaMaxv0radius))
+        return false;
+      if (lambda.dcaV0daughters() > Lambdadcav0dau)
+        return false;
+    }
     std::array<float, 3> pVecPhotons{gamma.px(), gamma.py(), gamma.pz()};
     std::array<float, 3> pVecLambda{lambda.px(), lambda.py(), lambda.pz()};
     auto arrMom = std::array{pVecPhotons, pVecLambda};
@@ -96,9 +150,9 @@ struct sigma0builder {
     return true;
   }
 
-  void processMonteCarlo(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MCDatas, aod::V0LambdaMLScores, aod::V0GammaMLScores> const& v0s)
+  void processMonteCarlo(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MCDatas, aod::V0LambdaMLScores, aod::V0GammaMLScores, aod::V0AntiLambdaMLScores> const& v0s)
   {
-    histos.fill(HIST("hEventVertexZMC"), coll.posZ());
+    histos.fill(HIST("hEventVertexZ"), coll.posZ());
 
     for (auto& gamma : v0s) { // selecting photons from Sigma0
 
@@ -108,7 +162,6 @@ struct sigma0builder {
         if ((lambda.pdgCode() != 3122) || (lambda.pdgCodeMother() != 3212))
           continue;
 
-        // if (gamma.motherMCPartId()!=lambda.motherMCPartId()) continue;
         if (!processSigmaCandidate(coll, lambda, gamma))
           continue;
         bool fIsSigma = (gamma.motherMCPartId() == lambda.motherMCPartId());
@@ -119,7 +172,7 @@ struct sigma0builder {
     }
   }
 
-  void processRealData(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0LambdaMLScores, aod::V0GammaMLScores> const& v0s)
+  void processRealData(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0LambdaMLScores, aod::V0GammaMLScores, aod::V0AntiLambdaMLScores> const& v0s)
   {
     histos.fill(HIST("hEventVertexZ"), coll.posZ());
 
@@ -161,7 +214,7 @@ struct sigma0builder {
                  fPhotonRadius, fPhotonCosPA, fPhotonDCADau, fPhotonDCANegPV, fPhotonDCAPosPV,
                  fPhotonZconv, fLambdaPt, fLambdaMass, fLambdaQt, fLambdaAlpha, fLambdaRadius,
                  fLambdaCosPA, fLambdaDCADau, fLambdaDCANegPV, fLambdaDCAPosPV,
-                 gamma.gammaBDTScore(), lambda.lambdaBDTScore());
+                 gamma.gammaBDTScore(), lambda.lambdaBDTScore(), lambda.antiLambdaBDTScore());
       }
     }
   }
