@@ -48,11 +48,23 @@ using namespace o2::framework::expressions;
 using std::array;
 using std::cout;
 using std::endl;
+using dauTracks = soa::Join<aod::DauTrackExtras, aod::DauTrackTPCPIDs>;
+using V0DerivedDatas = soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MCDatas, aod::V0LambdaMLScores, aod::V0GammaMLScores, aod::V0AntiLambdaMLScores>;
 
 struct sigma0builder {
-  Produces<aod::V0SigmaCandidates> v0Sigmas;     // save sigma0 candidates for analysis
-  Produces<aod::V0SigmaMCCandidates> v0MCSigmas; // save sigma0 candidates for analysis
+  SliceCache cache;
 
+  Produces<aod::Sigma0Collision> v0sigma0Coll;        // characterises collisions
+  Produces<aod::V0Sigma0CollRefs> v0Sigma0CollRefs;        // characterises collisions
+  Produces<aod::V0SigmaCandidates> v0Sigmas;     // save sigma0 candidates for analysis
+  Produces<aod::V0SigmaPhotonExtras> v0SigmaPhotonExtras;     // save sigma0 candidates for analysis
+  Produces<aod::V0SigmaLambdaExtras> v0SigmaLambdaExtras;     // save sigma0 candidates for analysis
+  Produces<aod::V0SigmaMCCandidates> v0MCSigmas; 
+
+  // For manual sliceBy
+  Preslice<V0DerivedDatas> perCollisionDerived = o2::aod::v0data::straCollisionId;
+
+  // Histogram registry
   HistogramRegistry histos{"Histos", {}, OutputObjHandlingPolicy::AnalysisObject};
 
   // Analysis strategy:
@@ -98,11 +110,12 @@ struct sigma0builder {
   struct {
     float mass;
     float pT;
+    float Rapidity;
   } sigmaCandidate;
 
   // Process sigma candidate and store properties in object
-  template <typename TV0Object, typename TCollision>
-  bool processSigmaCandidate(TCollision const&, TV0Object const& lambda, TV0Object const& gamma)
+  template <typename TV0Object>
+  bool processSigmaCandidate(TV0Object const& lambda, TV0Object const& gamma)
   {
     if ((lambda.v0Type()==0) || (gamma.v0Type()==0))
       return false;
@@ -119,7 +132,6 @@ struct sigma0builder {
     else{
       // Standard selection
       // Gamma selection criteria:
-    
       if (TMath::Abs(gamma.mGamma()) > PhotonMaxMass)
         return false;
       if ((TMath::Abs(gamma.negativeeta()) > PhotonDauPseudoRap) || (TMath::Abs(gamma.positiveeta()) > PhotonDauPseudoRap))
@@ -130,7 +142,6 @@ struct sigma0builder {
         return false;
       if ((gamma.v0radius() < PhotonMinRadius) || (gamma.v0radius() > PhotonMaxRadius))
         return false;
-
       if (TMath::Abs(lambda.mLambda() - 1.115683) > LambdaWindow)
         return false;
       if ((TMath::Abs(lambda.negativeeta()) > LambdaDauPseudoRap) || (TMath::Abs(lambda.positiveeta()) > LambdaDauPseudoRap))
@@ -147,10 +158,11 @@ struct sigma0builder {
     auto arrMom = std::array{pVecPhotons, pVecLambda};
     sigmaCandidate.mass = RecoDecay::m(arrMom, std::array{o2::constants::physics::MassPhoton, o2::constants::physics::MassLambda0});
     sigmaCandidate.pT = RecoDecay::pt(array{gamma.px() + lambda.px(), gamma.py() + lambda.py()});
+    sigmaCandidate.Rapidity = RecoDecay::y(std::array{gamma.px() + lambda.px(), gamma.py() + lambda.py(), gamma.pz() + lambda.pz()}, o2::constants::physics::MassSigma0);
     return true;
   }
 
-  void processMonteCarlo(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MCDatas, aod::V0LambdaMLScores, aod::V0GammaMLScores, aod::V0AntiLambdaMLScores> const& v0s)
+  void processMonteCarlo(aod::StraCollision const& coll, V0DerivedDatas const& v0s, dauTracks const&)
   {
     histos.fill(HIST("hEventVertexZ"), coll.posZ());
 
@@ -162,7 +174,7 @@ struct sigma0builder {
         if ((lambda.pdgCode() != 3122) || (lambda.pdgCodeMother() != 3212))
           continue;
 
-        if (!processSigmaCandidate(coll, lambda, gamma))
+        if (!processSigmaCandidate(lambda, gamma))
           continue;
         bool fIsSigma = (gamma.motherMCPartId() == lambda.motherMCPartId());
 
@@ -172,51 +184,126 @@ struct sigma0builder {
     }
   }
 
-  void processRealData(aod::StraCollision const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0LambdaMLScores, aod::V0GammaMLScores, aod::V0AntiLambdaMLScores> const& v0s)
+  void processRealData(soa::Join<aod::StraCollisions, aod::StraCents> const& collisions, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0LambdaMLScores, aod::V0GammaMLScores, aod::V0AntiLambdaMLScores> const& V0s, dauTracks const&)
   {
-    histos.fill(HIST("hEventVertexZ"), coll.posZ());
 
-    for (auto& gamma : v0s) {    // selecting photons from Sigma0
-      for (auto& lambda : v0s) { // selecting lambdas from Sigma0
-        if (!processSigmaCandidate(coll, lambda, gamma))
-          continue;
+    for (const auto& coll : collisions) {
+      // Do analysis with collision-grouped V0s, retain full collision information
+      const uint64_t collIdx = coll.globalIndex();
+      auto V0Table_thisCollision = V0s.sliceBy(perCollisionDerived, collIdx);
 
-        // Sigma related
-        float fSigmapT = sigmaCandidate.pT;
-        float fSigmaMass = sigmaCandidate.mass;
+      histos.fill(HIST("hEventVertexZ"), coll.posZ());
+      v0sigma0Coll(coll.posX(), coll.posY(), coll.posZ(), coll.centFT0M(), coll.centFT0A(), coll.centFT0C(), coll.centFV0A());
 
-        // Daughters related
-        /// Photon
-        float fPhotonPt = gamma.pt();
-        float fPhotonMass = gamma.mGamma();
-        float fPhotonQt = gamma.qtarm();
-        float fPhotonAlpha = gamma.alpha();
-        float fPhotonRadius = gamma.v0radius();
-        float fPhotonCosPA = gamma.v0cosPA();
-        float fPhotonDCADau = gamma.dcaV0daughters();
-        float fPhotonDCANegPV = gamma.dcanegtopv();
-        float fPhotonDCAPosPV = gamma.dcapostopv();
-        float fPhotonZconv = gamma.z();
+      for (int i = 0; i < V0Table_thisCollision.size(); i++)
+        v0Sigma0CollRefs(v0sigma0Coll.lastIndex());
 
-        // Lambda
-        float fLambdaPt = lambda.pt();
-        float fLambdaMass = lambda.mLambda();
-        float fLambdaQt = lambda.qtarm();
-        float fLambdaAlpha = lambda.alpha();
-        float fLambdaRadius = lambda.v0radius();
-        float fLambdaCosPA = lambda.v0cosPA();
-        float fLambdaDCADau = lambda.dcaV0daughters();
-        float fLambdaDCANegPV = lambda.dcanegtopv();
-        float fLambdaDCAPosPV = lambda.dcapostopv();
+      // V0 table sliced
+      for (auto& gamma : V0Table_thisCollision) {    // selecting photons from Sigma0
+        for (auto& lambda : V0Table_thisCollision) { // selecting lambdas from Sigma0
+          if (!processSigmaCandidate(lambda, gamma))
+            continue;
 
-        // Filling TTree for ML analysis
-        v0Sigmas(fSigmapT, fSigmaMass, fPhotonPt, fPhotonMass, fPhotonQt, fPhotonAlpha,
-                 fPhotonRadius, fPhotonCosPA, fPhotonDCADau, fPhotonDCANegPV, fPhotonDCAPosPV,
-                 fPhotonZconv, fLambdaPt, fLambdaMass, fLambdaQt, fLambdaAlpha, fLambdaRadius,
-                 fLambdaCosPA, fLambdaDCADau, fLambdaDCANegPV, fLambdaDCAPosPV,
-                 gamma.gammaBDTScore(), lambda.lambdaBDTScore(), lambda.antiLambdaBDTScore());
+          // Sigma related
+          float fSigmapT = sigmaCandidate.pT;
+          float fSigmaMass = sigmaCandidate.mass;
+          float fSigmaRap = sigmaCandidate.Rapidity;
+
+          // Daughters related
+          /// Photon
+          auto posTrackGamma = gamma.template posTrackExtra_as<dauTracks>();
+          auto negTrackGamma = gamma.template negTrackExtra_as<dauTracks>();
+
+          float fPhotonPt = gamma.pt();
+          float fPhotonMass = gamma.mGamma();
+          float fPhotonQt = gamma.qtarm();
+          float fPhotonAlpha = gamma.alpha();
+          float fPhotonRadius = gamma.v0radius();
+          float fPhotonCosPA = gamma.v0cosPA();
+          float fPhotonDCADau = gamma.dcaV0daughters();
+          float fPhotonDCANegPV = gamma.dcanegtopv();
+          float fPhotonDCAPosPV = gamma.dcapostopv();
+          float fPhotonZconv = gamma.z();
+          float fPhotonEta = gamma.eta();
+          float fPhotonY = RecoDecay::y(std::array{gamma.px(), gamma.py(), gamma.pz()}, o2::constants::physics::MassGamma);
+          float fPhotonPosTPCNSigma = posTrackGamma.tpcNSigmaEl();
+          float fPhotonNegTPCNSigma = negTrackGamma.tpcNSigmaEl();
+          uint8_t fPhotonPosTPCCrossedRows = posTrackGamma.tpcCrossedRows();
+          uint8_t fPhotonNegTPCCrossedRows = negTrackGamma.tpcCrossedRows();
+          float fPhotonPosPt = gamma.positivept();
+          float fPhotonNegPt = gamma.negativept();
+          float fPhotonPosEta = gamma.positiveeta();
+          float fPhotonNegEta = gamma.negativeeta();
+          float fPhotonPosY = RecoDecay::y(std::array{gamma.pxpos(), gamma.pypos(), gamma.pzpos()}, o2::constants::physics::MassElectron);
+          float fPhotonNegY = RecoDecay::y(std::array{gamma.pxneg(), gamma.pyneg(), gamma.pzneg()}, o2::constants::physics::MassElectron);
+          float fPhotonPsiPair = gamma.psipair(); 
+          int fPhotonPosITSCls = posTrackGamma.itsNCls();
+          int fPhotonNegITSCls = negTrackGamma.itsNCls();
+          uint32_t fPhotonPosITSClSize = posTrackGamma.itsClusterSizes();
+          uint32_t fPhotonNegITSClSize = negTrackGamma.itsClusterSizes();
+          uint8_t fPhotonV0Type = gamma.v0Type();
+
+          // Lambda
+          auto posTrackLambda = lambda.template posTrackExtra_as<dauTracks>();
+          auto negTrackLambda = lambda.template negTrackExtra_as<dauTracks>();
+
+          float fLambdaPt = lambda.pt();
+          float fLambdaMass = lambda.mLambda();
+          float fLambdaQt = lambda.qtarm();
+          float fLambdaAlpha = lambda.alpha();
+          float fLambdaRadius = lambda.v0radius();
+          float fLambdaCosPA = lambda.v0cosPA();
+          float fLambdaDCADau = lambda.dcaV0daughters();
+          float fLambdaDCANegPV = lambda.dcanegtopv();
+          float fLambdaDCAPosPV = lambda.dcapostopv();
+          float fLambdaEta = lambda.eta();
+          float fLambdaY = lambda.yLambda();
+          float fLambdaPosPrTPCNSigma = posTrackLambda.tpcNSigmaPr();
+          float fLambdaPosPiTPCNSigma = posTrackLambda.tpcNSigmaPi();
+          float fLambdaNegPrTPCNSigma = negTrackLambda.tpcNSigmaPr();
+          float fLambdaNegPiTPCNSigma = negTrackLambda.tpcNSigmaPi();
+          uint8_t fLambdaPosTPCCrossedRows = posTrackLambda.tpcCrossedRows();
+          uint8_t fLambdaNegTPCCrossedRows = negTrackLambda.tpcCrossedRows();
+          float fLambdaPosPt = lambda.positivept();
+          float fLambdaNegPt = lambda.negativept();
+          float fLambdaPosEta = lambda.positiveeta();
+          float fLambdaNegEta = lambda.negativeeta();
+          float fLambdaPosPrY = RecoDecay::y(std::array{lambda.pxpos(), lambda.pypos(), lambda.pzpos()}, o2::constants::physics::MassProton);
+          float fLambdaPosPiY = RecoDecay::y(std::array{lambda.pxpos(), lambda.pypos(), lambda.pzpos()}, o2::constants::physics::MassPionCharged);
+          float fLambdaNegPrY = RecoDecay::y(std::array{lambda.pxneg(), lambda.pyneg(), lambda.pzneg()}, o2::constants::physics::MassProton);
+          float fLambdaNegPiY = RecoDecay::y(std::array{lambda.pxneg(), lambda.pyneg(), lambda.pzneg()}, o2::constants::physics::MassPionCharged);
+          int fLambdaPosITSCls = posTrackLambda.itsNCls();
+          int fLambdaNegITSCls = negTrackLambda.itsNCls();
+          uint32_t fLambdaPosITSClSize = posTrackLambda.itsClusterSizes();
+          uint32_t fLambdaNegITSClSize = negTrackLambda.itsClusterSizes();
+          uint8_t fLambdaV0Type = lambda.v0Type();
+
+          // Filling TTree for ML analysis
+          v0Sigmas(fSigmapT, fSigmaMass, fSigmaRap);
+          
+          v0SigmaPhotonExtras(fPhotonPt, fPhotonMass, fPhotonQt, fPhotonAlpha, fPhotonRadius,
+                              fPhotonCosPA, fPhotonDCADau, fPhotonDCANegPV, fPhotonDCAPosPV, fPhotonZconv,
+                              fPhotonEta, fPhotonY,fPhotonPosTPCNSigma, fPhotonNegTPCNSigma, fPhotonPosTPCCrossedRows,
+                              fPhotonNegTPCCrossedRows, fPhotonPosPt, fPhotonNegPt, fPhotonPosEta,
+                              fPhotonNegEta, fPhotonPosY, fPhotonNegY, fPhotonPsiPair,
+                              fPhotonPosITSCls, fPhotonNegITSCls, fPhotonPosITSClSize, fPhotonNegITSClSize,
+                              fPhotonV0Type, gamma.gammaBDTScore());
+                  
+                  
+          v0SigmaLambdaExtras(fLambdaPt,fLambdaMass,fLambdaQt, fLambdaAlpha,
+                              fLambdaRadius, fLambdaCosPA, fLambdaDCADau, fLambdaDCANegPV,
+                              fLambdaDCAPosPV, fLambdaEta, fLambdaY, fLambdaPosPrTPCNSigma,
+                              fLambdaPosPiTPCNSigma, fLambdaNegPrTPCNSigma, fLambdaNegPiTPCNSigma, fLambdaPosTPCCrossedRows,
+                              fLambdaNegTPCCrossedRows, fLambdaPosPt, fLambdaNegPt,fLambdaPosEta,
+                              fLambdaNegEta, fLambdaPosPrY, fLambdaPosPiY, fLambdaNegPrY, fLambdaNegPiY,
+                              fLambdaPosITSCls, fLambdaNegITSCls, fLambdaPosITSClSize, fLambdaNegITSClSize,
+                              fLambdaV0Type, lambda.lambdaBDTScore(), lambda.antiLambdaBDTScore());
+        }
       }
+
+      
     }
+
   }
   PROCESS_SWITCH(sigma0builder, processMonteCarlo, "Do Monte-Carlo-based analysis", false);
   PROCESS_SWITCH(sigma0builder, processRealData, "Do real data analysis", true);
