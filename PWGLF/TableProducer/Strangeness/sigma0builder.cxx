@@ -49,7 +49,8 @@ using std::array;
 using std::cout;
 using std::endl;
 using dauTracks = soa::Join<aod::DauTrackExtras, aod::DauTrackTPCPIDs>;
-using V0DerivedDatas = soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MCDatas, aod::V0LambdaMLScores, aod::V0GammaMLScores, aod::V0AntiLambdaMLScores>;
+using V0DerivedMCDatas = soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MCDatas, aod::V0LambdaMLScores, aod::V0GammaMLScores, aod::V0AntiLambdaMLScores>;
+using V0DerivedDatas = soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0LambdaMLScores, aod::V0GammaMLScores, aod::V0AntiLambdaMLScores>;
 
 struct sigma0builder {
   SliceCache cache;
@@ -131,7 +132,7 @@ struct sigma0builder {
     }
     else{
       // Standard selection
-      // Gamma selection criteria:
+      // Gamma basic selection criteria:
       if (TMath::Abs(gamma.mGamma()) > PhotonMaxMass)
         return false;
       if ((TMath::Abs(gamma.negativeeta()) > PhotonDauPseudoRap) || (TMath::Abs(gamma.positiveeta()) > PhotonDauPseudoRap))
@@ -142,6 +143,8 @@ struct sigma0builder {
         return false;
       if ((gamma.v0radius() < PhotonMinRadius) || (gamma.v0radius() > PhotonMaxRadius))
         return false;
+
+      // Lambda basic selection criteria:
       if (TMath::Abs(lambda.mLambda() - 1.115683) > LambdaWindow)
         return false;
       if ((TMath::Abs(lambda.negativeeta()) > LambdaDauPseudoRap) || (TMath::Abs(lambda.positiveeta()) > LambdaDauPseudoRap))
@@ -162,31 +165,31 @@ struct sigma0builder {
     return true;
   }
 
-  void processMonteCarlo(aod::StraCollision const& coll, V0DerivedDatas const& v0s, dauTracks const&)
+  void processMonteCarlo(aod::StraCollisions const& collisions, V0DerivedMCDatas const& V0s, dauTracks const&)
   {
-    histos.fill(HIST("hEventVertexZ"), coll.posZ());
+    for (const auto& coll : collisions) {
+      // Do analysis with collision-grouped V0s, retain full collision information
+      const uint64_t collIdx = coll.globalIndex();
+      auto V0Table_thisCollision = V0s.sliceBy(perCollisionDerived, collIdx);
 
-    for (auto& gamma : v0s) { // selecting photons from Sigma0
+      // V0 table sliced
+      for (auto& gamma : V0Table_thisCollision) {    // selecting photons from Sigma0
+        for (auto& lambda : V0Table_thisCollision) { // selecting lambdas from Sigma0
+          if (!processSigmaCandidate(lambda, gamma))
+            continue;
 
-      if ((gamma.pdgCode() != 22) || (gamma.pdgCodeMother() != 3212))
-        continue;
-      for (auto& lambda : v0s) { // selecting lambdas from Sigma0
-        if ((lambda.pdgCode() != 3122) || (lambda.pdgCodeMother() != 3212))
-          continue;
-
-        if (!processSigmaCandidate(lambda, gamma))
-          continue;
-        bool fIsSigma = (gamma.motherMCPartId() == lambda.motherMCPartId());
-
-        // Filling TTree for ML analysis
-        v0MCSigmas(fIsSigma);
+          bool fIsSigma = false;
+          if ((gamma.pdgCode()==22) && (gamma.pdgCodeMother()==3212) && (lambda.pdgCode()==3122) && (lambda.pdgCodeMother()==3212) && (gamma.motherMCPartId() == lambda.motherMCPartId()))
+            fIsSigma = true;
+          
+          v0MCSigmas(fIsSigma);
+        }
       }
     }
   }
 
-  void processRealData(soa::Join<aod::StraCollisions, aod::StraCents> const& collisions, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0LambdaMLScores, aod::V0GammaMLScores, aod::V0AntiLambdaMLScores> const& V0s, dauTracks const&)
+  void processRealData(soa::Join<aod::StraCollisions, aod::StraCents> const& collisions, V0DerivedDatas const& V0s, dauTracks const&)
   {
-
     for (const auto& coll : collisions) {
       // Do analysis with collision-grouped V0s, retain full collision information
       const uint64_t collIdx = coll.globalIndex();
@@ -299,9 +302,7 @@ struct sigma0builder {
                               fLambdaPosITSCls, fLambdaNegITSCls, fLambdaPosITSClSize, fLambdaNegITSClSize,
                               fLambdaV0Type, lambda.lambdaBDTScore(), lambda.antiLambdaBDTScore());
         }
-      }
-
-      
+      } 
     }
 
   }
