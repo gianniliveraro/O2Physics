@@ -94,13 +94,16 @@ struct sigma0builder {
   Configurable<float> PhotonMaxRadius{"PhotonMaxRadius", 250, "Max photon conversion radius (cm)"};
   Configurable<float> PhotonMaxMass{"PhotonMaxMass", 0.2, "Max photon mass (GeV/c^{2})"};
   
+  //// Sigma0 criteria:
+  Configurable<float> Sigma0Window{"Sigma0Window", 0.04, "Mass window around expected (in GeV/c2)"};
+
   // Axis
   // base properties
   ConfigurableAxis vertexZ{"vertexZ", {30, -15.0f, 15.0f}, ""};
 
   // Invariant Mass
   ConfigurableAxis axisSigmaMass{"axisSigmaMass", {200, 1.16f, 1.23f}, "M_{#Sigma^{0}} (GeV/c^{2})"};
-
+  int nSigmaCandidates = 0;
   void init(InitContext const&)
   {
     // Event counter
@@ -156,12 +159,18 @@ struct sigma0builder {
       if (lambda.dcaV0daughters() > Lambdadcav0dau)
         return false;
     }
+
+    // Sigma0 candidate properties
     std::array<float, 3> pVecPhotons{gamma.px(), gamma.py(), gamma.pz()};
     std::array<float, 3> pVecLambda{lambda.px(), lambda.py(), lambda.pz()};
     auto arrMom = std::array{pVecPhotons, pVecLambda};
     sigmaCandidate.mass = RecoDecay::m(arrMom, std::array{o2::constants::physics::MassPhoton, o2::constants::physics::MassLambda0});
     sigmaCandidate.pT = RecoDecay::pt(array{gamma.px() + lambda.px(), gamma.py() + lambda.py()});
     sigmaCandidate.Rapidity = RecoDecay::y(std::array{gamma.px() + lambda.px(), gamma.py() + lambda.py(), gamma.pz() + lambda.pz()}, o2::constants::physics::MassSigma0);
+
+    if (TMath::Abs(sigmaCandidate.mass - 1.192642) > Sigma0Window)
+        return false;
+
     return true;
   }
 
@@ -198,14 +207,16 @@ struct sigma0builder {
       histos.fill(HIST("hEventVertexZ"), coll.posZ());
       v0sigma0Coll(coll.posX(), coll.posY(), coll.posZ(), coll.centFT0M(), coll.centFT0A(), coll.centFT0C(), coll.centFV0A());
 
-      for (int i = 0; i < V0Table_thisCollision.size(); i++)
-        v0Sigma0CollRefs(v0sigma0Coll.lastIndex());
-
       // V0 table sliced
       for (auto& gamma : V0Table_thisCollision) {    // selecting photons from Sigma0
         for (auto& lambda : V0Table_thisCollision) { // selecting lambdas from Sigma0
           if (!processSigmaCandidate(lambda, gamma))
             continue;
+
+          nSigmaCandidates++;
+          if (nSigmaCandidates % 5000 == 0) {
+          LOG(info) << "Sigma0 Candidates built: " << nSigmaCandidates;
+          }
 
           // Sigma related
           float fSigmapT = sigmaCandidate.pT;
@@ -283,6 +294,8 @@ struct sigma0builder {
 
           // Filling TTree for ML analysis
           v0Sigmas(fSigmapT, fSigmaMass, fSigmaRap);
+          
+          v0Sigma0CollRefs(v0sigma0Coll.lastIndex());
           
           v0SigmaPhotonExtras(fPhotonPt, fPhotonMass, fPhotonQt, fPhotonAlpha, fPhotonRadius,
                               fPhotonCosPA, fPhotonDCADau, fPhotonDCANegPV, fPhotonDCAPosPV, fPhotonZconv,

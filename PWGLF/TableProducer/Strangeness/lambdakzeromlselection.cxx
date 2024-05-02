@@ -186,6 +186,7 @@ struct lambdakzeromlselection {
     Feature_SelMask.reserve(CastKine_SelMap.size() + CastTopo_SelMap.size()); // Reserve space to avoid reallocations
     Feature_SelMask.insert(Feature_SelMask.end(), CastKine_SelMap.begin(), CastKine_SelMap.end());
     Feature_SelMask.insert(Feature_SelMask.end(), CastTopo_SelMap.begin(), CastTopo_SelMap.end());
+    LOG(info) << "Feature_SelMask size: " << Feature_SelMask.size();
   }
 
   template<typename T, typename U>
@@ -238,6 +239,10 @@ struct lambdakzeromlselection {
   {
     histos.fill(HIST("hEventVertexZ"), coll.posZ());
     for (auto& v0 : v0s) {
+      nCandidates++;
+      if (nCandidates % 50000 == 0) {
+        LOG(info) << "Candidates processed: " << nCandidates;
+      }
       processCandidate(v0, Feature_SelMask);
     }
   }
@@ -245,6 +250,10 @@ struct lambdakzeromlselection {
   {
     histos.fill(HIST("hEventVertexZ"), coll.posZ());
     for (auto& v0 : v0s) {
+      nCandidates++;
+      if (nCandidates % 50000 == 0) {
+        LOG(info) << "Candidates processed: " << nCandidates;
+      }
       processCandidate(v0, Feature_SelMask);
     }
   }

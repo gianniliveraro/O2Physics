@@ -61,6 +61,7 @@ struct sigmaanalysis {
 
   // Analysis strategy:
   Configurable<bool> fUseMLSel{"fUseMLSel", true, "Flag to use ML selection. If False, the standard selection is applied."}; 
+  Configurable<bool> fProcessMonteCarlo{"fProcessMonteCarlo", false, "Flag to process MC data."}; 
 
   // For ML Selection
   Configurable<float> Gamma_MLThreshold{"Gamma_MLThreshold", 0.1, "Decision Threshold value to select gammas"};
@@ -129,7 +130,7 @@ struct sigmaanalysis {
 
   // ML
   ConfigurableAxis MLProb{"MLOutput", {100, 0.0f, 1.0f}, ""};
-
+  int nSigmaCandidates = 0;
   void init(InitContext const&)
   {
     // Event counter
@@ -199,6 +200,20 @@ struct sigmaanalysis {
     histos.add("AntiLambda/h2dAntiLambdaRadiusVsPt", "h2dAntiLambdaRadiusVsPt", {HistType::kTH2F, {axisPt, axisRadius}});
     histos.add("AntiLambda/h2dAntiLambdaMassVsMLScore", "h2dAntiLambdaMassVsMLScore", {HistType::kTH2F, {MLProb, axisLambdaMass}});
 
+    if (fProcessMonteCarlo) {
+      // Event counter
+      histos.add("hMCEventCentrality", "hMCEventCentrality", kTH1F, {axisCentrality});
+
+      // For Signal Extraction 
+      histos.add("h3dMCMassSigma0", "h3dMCMassSigma0", kTH3F, {axisCentrality, axisPt, axisSigmaMass});
+
+      histos.add("GeneralQA/h2dMCArmenterosAll", "h2dMCArmenterosAll", {HistType::kTH2F, {axisAPAlpha, axisAPQt}});
+      histos.add("GeneralQA/h2dMCArmenterosSelected", "h2dMCArmenterosSelected", {HistType::kTH2F, {axisAPAlpha, axisAPQt}});
+
+      // Sigma0 QA
+      histos.add("Sigma0/hMCMassSigma0", "hMCMassSigma0", kTH1F, {axisSigmaMass});
+      histos.add("Sigma0/hMCPtSigma0", "hMCPtSigma0", kTH1F, {axisPt});
+    }
     // if (doprocessCounterQA) {
     //   histos.add("hGammaIndices", "hGammaIndices", {HistType::kTH1F, {{4000, 0.0f, 400000.0f}}});
     //   histos.add("hCollIndices", "hCollIndices", {HistType::kTH1F, {{4000, 0.0f, 4000.0f}}});
@@ -289,23 +304,22 @@ struct sigmaanalysis {
 
   void processMonteCarlo(aod::Sigma0Collision const& coll, V0MCSigmas const& v0s)
   {
-    histos.fill(HIST("hEventCentrality"), coll.centFT0C());
+    histos.fill(HIST("hMCEventCentrality"), coll.centFT0C());
     for (auto& sigma : v0s) {    // selecting Sigma0-like candidates
         if (sigma.isSigma()){
-          histos.fill(HIST("GeneralQA/h2dArmenterosAll"), sigma.photonAlpha(), sigma.photonQt());
-          histos.fill(HIST("GeneralQA/h2dArmenterosAll"), sigma.lambdaAlpha(), sigma.lambdaQt());
+          histos.fill(HIST("GeneralQA/h2dMCArmenterosAll"), sigma.photonAlpha(), sigma.photonQt());
+          histos.fill(HIST("GeneralQA/h2dMCArmenterosAll"), sigma.lambdaAlpha(), sigma.lambdaQt());
           
           if (!processSigmaCandidate(sigma))
             continue;
 
-          histos.fill(HIST("GeneralQA/h2dArmenterosSelected"), sigma.photonAlpha(), sigma.photonQt());
-          histos.fill(HIST("GeneralQA/h2dArmenterosSelected"), sigma.lambdaAlpha(), sigma.lambdaQt());
+          histos.fill(HIST("GeneralQA/h2dMCArmenterosSelected"), sigma.photonAlpha(), sigma.photonQt());
+          histos.fill(HIST("GeneralQA/h2dMCArmenterosSelected"), sigma.lambdaAlpha(), sigma.lambdaQt());
           
-          histos.fill(HIST("Sigma0/hMassSigma0"), sigma.sigmaMass());
-          histos.fill(HIST("Sigma0/hPtSigma0"), sigma.sigmapT());
-          histos.fill(HIST("Sigma0/hRapiditySigma0"), sigma.sigmaRapidity());
+          histos.fill(HIST("Sigma0/hMCMassSigma0"), sigma.sigmaMass());
+          histos.fill(HIST("Sigma0/hMCPtSigma0"), sigma.sigmapT());
 
-          histos.fill(HIST("h3dMassSigma0"), coll.centFT0C(), sigma.sigmapT(), sigma.sigmaMass());
+          histos.fill(HIST("h3dMCMassSigma0"), coll.centFT0C(), sigma.sigmapT(), sigma.sigmaMass());
         }
       }
   }
@@ -316,6 +330,11 @@ struct sigmaanalysis {
     for (auto& sigma : v0s) {    // selecting Sigma0-like candidates
         histos.fill(HIST("GeneralQA/h2dArmenterosAll"), sigma.photonAlpha(), sigma.photonQt());
         histos.fill(HIST("GeneralQA/h2dArmenterosAll"), sigma.lambdaAlpha(), sigma.lambdaQt());
+
+        nSigmaCandidates++;
+        if (nSigmaCandidates % 50000 == 0) {
+          LOG(info) << "Sigma0 Candidates processed: " << nSigmaCandidates;
+        }
         if (!processSigmaCandidate(sigma))
           continue;
 
