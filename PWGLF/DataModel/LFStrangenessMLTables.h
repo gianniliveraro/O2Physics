@@ -69,6 +69,7 @@ DECLARE_SOA_COLUMN(IsLambda, isLambda, bool);
 DECLARE_SOA_COLUMN(IsAntiLambda, isAntiLambda, bool);
 DECLARE_SOA_COLUMN(IsGamma, isGamma, bool);
 DECLARE_SOA_COLUMN(IsKZeroShort, isKZeroShort, bool);
+DECLARE_SOA_COLUMN(PDGCodeMother, pdgCodeMother, int);
 } // namespace v0mlcandidates
 
 DECLARE_SOA_TABLE(V0MLCandidates, "AOD", "V0MLCANDIDATES",
@@ -114,7 +115,8 @@ DECLARE_SOA_TABLE(V0MLCandidates, "AOD", "V0MLCANDIDATES",
                   v0mlcandidates::IsLambda,
                   v0mlcandidates::IsAntiLambda,
                   v0mlcandidates::IsGamma,
-                  v0mlcandidates::IsKZeroShort);
+                  v0mlcandidates::IsKZeroShort,
+                  v0mlcandidates::PDGCodeMother);
 
 namespace V0MLSelection
 {

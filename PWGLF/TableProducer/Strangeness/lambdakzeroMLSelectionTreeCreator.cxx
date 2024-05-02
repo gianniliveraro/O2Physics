@@ -160,6 +160,7 @@ struct lambdakzeroMLSelectionTreeCreator {
     bool isAntiLambda;
     bool isGamma;
     bool isKZeroShort;
+    int PDGCodeMother;
   } Candidate;
 
   // Process candidate and store properties in object
@@ -254,12 +255,17 @@ struct lambdakzeroMLSelectionTreeCreator {
     Candidate.isAntiLambda = false;
     Candidate.isGamma = false;
     Candidate.isKZeroShort = false;
+    Candidate.PDGCodeMother = -1;
 
     if constexpr (requires { cand.pdgCode(); }) {
       Candidate.isLambda = (cand.pdgCode() == 3122);
       Candidate.isAntiLambda = (cand.pdgCode() == -3122);
       Candidate.isGamma = (cand.pdgCode() == 22);
       Candidate.isKZeroShort = (cand.pdgCode() == 310);
+    }
+
+    if constexpr (requires { cand.pdgCodeMother(); }) {
+      Candidate.PDGCodeMother = cand.pdgCodeMother();
     }
 
     // Filling TTree for ML analysis
@@ -270,7 +276,7 @@ struct lambdakzeroMLSelectionTreeCreator {
                    Candidate.LambdaMass, Candidate.AntiLambdaMass, Candidate.GammaMass, Candidate.KZeroShortMass, Candidate.pT,
                    Candidate.qt, Candidate.alpha, Candidate.posEta, Candidate.negEta, Candidate.v0Eta, Candidate.Z,
                    Candidate.v0radius, Candidate.PA, Candidate.dcapostopv, Candidate.dcanegtopv, Candidate.dcaV0daughters, Candidate.dcav0topv, Candidate.PsiPair,
-                   Candidate.v0type, Candidate.centrality, Candidate.SelHypothesis, Candidate.isLambda, Candidate.isAntiLambda, Candidate.isGamma, Candidate.isKZeroShort);
+                   Candidate.v0type, Candidate.centrality, Candidate.SelHypothesis, Candidate.isLambda, Candidate.isAntiLambda, Candidate.isGamma, Candidate.isKZeroShort, Candidate.PDGCodeMother);
   }
 
   void processRealData(soa::Join<aod::StraCollisions, aod::StraCents>::iterator const& coll, soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0TOFNSigmas> const& v0s, dauTracks const&)
