@@ -57,7 +57,7 @@ using std::array;
 using std::cout;
 using std::endl;
 using dauTracks = soa::Join<aod::DauTrackExtras, aod::DauTrackTPCPIDs>;
-using V0DerivedMCDatas = soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MCDatas, aod::V0LambdaMLScores, aod::V0GammaMLScores, aod::V0AntiLambdaMLScores>;
+using V0DerivedMCDatas = soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MCDatas>;
 using V0MLDerivedDatas = soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0LambdaMLScores, aod::V0GammaMLScores, aod::V0AntiLambdaMLScores>;
 using V0StandardDerivedDatas = soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras>;
 
@@ -87,23 +87,23 @@ struct sigma0builder {
   // For standard approach:
   //// Lambda criteria:
   Configurable<float> LambdaDauPseudoRap{"LambdaDauPseudoRap", 1.0, "Max pseudorapidity of daughter tracks"};
-  Configurable<float> Lambdadcanegtopv{"Lambdadcanegtopv", .01, "min DCA Neg To PV (cm)"};
-  Configurable<float> Lambdadcapostopv{"Lambdadcapostopv", .01, "min DCA Pos To PV (cm)"};
-  Configurable<float> Lambdadcav0dau{"Lambdadcav0dau", 2.5, "Max DCA V0 Daughters (cm)"};
+  Configurable<float> LambdaMaxDCANegToPv{"LambdaMaxDCANegToPv", .01, "min DCA Neg To PV (cm)"};
+  Configurable<float> LambdaMaxDCAPosToPv{"LambdaMaxDCAPosToPv", .01, "min DCA Pos To PV (cm)"};
+  Configurable<float> LambdaMaxDCAV0Dau{"LambdaMaxDCAV0Dau", 2.5, "Max DCA V0 Daughters (cm)"};
   Configurable<float> LambdaMinv0radius{"LambdaMinv0radius", 0.1, "Min V0 radius (cm)"};
   Configurable<float> LambdaMaxv0radius{"LambdaMaxv0radius", 200, "Max V0 radius (cm)"};
   Configurable<float> LambdaWindow{"LambdaWindow", 0.01, "Mass window around expected (in GeV/c2)"};
 
   //// Photon criteria:
-  Configurable<float> PhotonDauPseudoRap{"PhotonDauPseudoRap", 1.0, "Max pseudorapidity of daughter tracks"};
-  Configurable<float> Photondcadautopv{"Photondcadautopv", 0.01, "Min DCA daughter To PV (cm)"};
-  Configurable<float> Photondcav0dau{"Photondcav0dau", 3.0, "Max DCA V0 Daughters (cm)"};
+  Configurable<float> PhotonMaxDauPseudoRap{"PhotonMaxDauPseudoRap", 1.0, "Max pseudorapidity of daughter tracks"};
+  Configurable<float> PhotonMaxDCAToPv{"PhotonMaxDCAToPv", 0.01, "Min DCA daughter To PV (cm)"};
+  Configurable<float> PhotonMaxDCAV0Dau{"PhotonMaxDCAV0Dau", 3.0, "Max DCA V0 Daughters (cm)"};
   Configurable<float> PhotonMinRadius{"PhotonMinRadius", 0.5, "Min photon conversion radius (cm)"};
   Configurable<float> PhotonMaxRadius{"PhotonMaxRadius", 250, "Max photon conversion radius (cm)"};
   Configurable<float> PhotonMaxMass{"PhotonMaxMass", 0.2, "Max photon mass (GeV/c^{2})"};
 
   //// Sigma0 criteria:
-  Configurable<float> Sigma0Window{"Sigma0Window", 0.04, "Mass window around expected (in GeV/c2)"};
+  Configurable<float> Sigma0Window{"Sigma0Window", 0.05, "Mass window around expected (in GeV/c2)"};
 
   // Axis
   // base properties
@@ -116,21 +116,10 @@ struct sigma0builder {
     histos.add("hEventVertexZ", "hEventVertexZ", kTH1F, {vertexZ});
   }
 
-  // Helper struct to pass v0 information
-  struct {
-    float mass;
-    float pT;
-    float Rapidity;
-  } sigmaCandidate;
-
   // Process sigma candidate and store properties in object
   template <typename TV0Object>
   bool processSigmaCandidate(TV0Object const& lambda, TV0Object const& gamma)
   {
-    float GammaBDTScore = -1;
-    float LambdaBDTScore = -1;
-    float AntiLambdaBDTScore = -1;
-
     if ((lambda.v0Type() == 0) || (gamma.v0Type() == 0))
       return false;
 
@@ -148,19 +137,16 @@ struct sigma0builder {
       if ((lambda.lambdaBDTScore() <= Lambda_MLThreshold) && (lambda.antiLambdaBDTScore() <= AntiLambda_MLThreshold))
         return false;
 
-      GammaBDTScore = gamma.gammaBDTScore();
-      LambdaBDTScore = lambda.lambdaBDTScore();
-      AntiLambdaBDTScore = lambda.antiLambdaBDTScore();
     } else {
       // Standard selection
       // Gamma basic selection criteria:
       if (TMath::Abs(gamma.mGamma()) > PhotonMaxMass)
         return false;
-      if ((TMath::Abs(gamma.negativeeta()) > PhotonDauPseudoRap) || (TMath::Abs(gamma.positiveeta()) > PhotonDauPseudoRap))
+      if ((TMath::Abs(gamma.negativeeta()) > PhotonMaxDauPseudoRap) || (TMath::Abs(gamma.positiveeta()) > PhotonMaxDauPseudoRap))
         return false;
-      if ((gamma.dcapostopv() > Photondcadautopv) || (gamma.dcanegtopv() > Photondcadautopv))
+      if ((gamma.dcapostopv() > PhotonMaxDCAToPv) || (gamma.dcanegtopv() > PhotonMaxDCAToPv))
         return false;
-      if (gamma.dcaV0daughters() > Photondcav0dau)
+      if (gamma.dcaV0daughters() > PhotonMaxDCAV0Dau)
         return false;
       if ((gamma.v0radius() < PhotonMinRadius) || (gamma.v0radius() > PhotonMaxRadius))
         return false;
@@ -170,12 +156,48 @@ struct sigma0builder {
         return false;
       if ((TMath::Abs(lambda.negativeeta()) > LambdaDauPseudoRap) || (TMath::Abs(lambda.positiveeta()) > LambdaDauPseudoRap))
         return false;
-      if ((lambda.dcapostopv() < Lambdadcapostopv) || (lambda.dcanegtopv() < Lambdadcanegtopv))
+      if ((lambda.dcapostopv() < LambdaMaxDCAPosToPv) || (lambda.dcanegtopv() < LambdaMaxDCANegToPv))
         return false;
       if ((lambda.v0radius() < LambdaMinv0radius) || (lambda.v0radius() > LambdaMaxv0radius))
         return false;
-      if (lambda.dcaV0daughters() > Lambdadcav0dau)
+      if (lambda.dcaV0daughters() > LambdaMaxDCAV0Dau)
         return false;
+    }
+    // Sigma0 candidate properties
+    std::array<float, 3> pVecPhotons{gamma.px(), gamma.py(), gamma.pz()};
+    std::array<float, 3> pVecLambda{lambda.px(), lambda.py(), lambda.pz()};
+    auto arrMom = std::array{pVecPhotons, pVecLambda};
+    float sigmamass = RecoDecay::m(arrMom, std::array{o2::constants::physics::MassPhoton, o2::constants::physics::MassLambda0});
+
+    if (TMath::Abs(sigmamass - 1.192642) > Sigma0Window)
+      return false;
+
+    return true;
+  }
+  // Helper struct to pass v0 information
+  struct {
+    float mass;
+    float pT;
+    float Rapidity;
+  } sigmaCandidate;
+
+  // Fill tables with reconstructed sigma0 candidate
+  template <typename TV0Object>
+  void fillTables(TV0Object const& lambda, TV0Object const& gamma)
+  {
+
+    float GammaBDTScore = -1;
+    float LambdaBDTScore = -1;
+    float AntiLambdaBDTScore = -1;
+
+    if constexpr (
+      requires { gamma.gammaBDTScore(); } &&
+      requires { lambda.lambdaBDTScore(); } &&
+      requires { lambda.antiLambdaBDTScore(); }) {
+
+      GammaBDTScore = gamma.gammaBDTScore();
+      LambdaBDTScore = lambda.lambdaBDTScore();
+      AntiLambdaBDTScore = lambda.antiLambdaBDTScore();
     }
 
     // Sigma0 candidate properties
@@ -185,10 +207,7 @@ struct sigma0builder {
     sigmaCandidate.mass = RecoDecay::m(arrMom, std::array{o2::constants::physics::MassPhoton, o2::constants::physics::MassLambda0});
     sigmaCandidate.pT = RecoDecay::pt(array{gamma.px() + lambda.px(), gamma.py() + lambda.py()});
     sigmaCandidate.Rapidity = RecoDecay::y(std::array{gamma.px() + lambda.px(), gamma.py() + lambda.py(), gamma.pz() + lambda.pz()}, o2::constants::physics::MassSigma0);
-
-    if (TMath::Abs(sigmaCandidate.mass - 1.192642) > Sigma0Window)
-      return false;
-
+    
     // Sigma related
     float fSigmapT = sigmaCandidate.pT;
     float fSigmaMass = sigmaCandidate.mass;
@@ -282,8 +301,6 @@ struct sigma0builder {
                         fLambdaNegEta, fLambdaPosPrY, fLambdaPosPiY, fLambdaNegPrY, fLambdaNegPiY,
                         fLambdaPosITSCls, fLambdaNegITSCls, fLambdaPosITSClSize, fLambdaNegITSClSize,
                         fLambdaV0Type, LambdaBDTScore, AntiLambdaBDTScore);
-
-    return true;
   }
 
   void processMonteCarlo(aod::StraCollisions const& collisions, V0DerivedMCDatas const& V0s, dauTracks const&)
@@ -322,7 +339,7 @@ struct sigma0builder {
       // V0 table sliced
       for (auto& gamma : V0Table_thisCollision) {    // selecting photons from Sigma0
         for (auto& lambda : V0Table_thisCollision) { // selecting lambdas from Sigma0
-          if (!processSigmaCandidate(lambda, gamma))
+          if (!processSigmaCandidate(lambda, gamma)) // applying selection for reconstruction
             continue;
 
           nSigmaCandidates++;
@@ -330,6 +347,7 @@ struct sigma0builder {
             LOG(info) << "Sigma0 Candidates built: " << nSigmaCandidates;
           }
           v0Sigma0CollRefs(v0sigma0Coll.lastIndex());
+          fillTables(lambda, gamma); // filling tables with accepted candidates
         }
       }
     }
@@ -356,6 +374,7 @@ struct sigma0builder {
             LOG(info) << "Sigma0 Candidates built: " << nSigmaCandidates;
           }
           v0Sigma0CollRefs(v0sigma0Coll.lastIndex());
+          fillTables(lambda, gamma); // filling tables with accepted candidates
         }
       }
     }

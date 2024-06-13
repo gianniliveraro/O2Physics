@@ -78,35 +78,35 @@ struct sigmaanalysis {
 
   // For Standard Selection:
   //// Lambda standard criteria::
-  Configurable<float> Lambdadcanegtopv{"Lambdadcanegtopv", .05, "min DCA Neg To PV (cm)"};
-  Configurable<float> Lambdadcapostopv{"Lambdadcapostopv", .05, "min DCA Pos To PV (cm)"};
-  Configurable<float> Lambdadcav0dau{"Lambdadcav0dau", 1.5, "Max DCA V0 Daughters (cm)"};
+  Configurable<float> LambdaMinDCANegToPv{"LambdaMinDCANegToPv", .05, "min DCA Neg To PV (cm)"};
+  Configurable<float> LambdaMinDCAPosToPv{"LambdaMinDCAPosToPv", .05, "min DCA Pos To PV (cm)"};
+  Configurable<float> LambdaMaxDCAV0Dau{"LambdaMaxDCAV0Dau", 1.5, "Max DCA V0 Daughters (cm)"};
   Configurable<float> LambdaMinv0radius{"LambdaMinv0radius", 0.5, "Min V0 radius (cm)"};
   Configurable<float> LambdaMaxv0radius{"LambdaMaxv0radius", 180, "Max V0 radius (cm)"};
-  Configurable<float> LambdaMinqt{"LambdaMinqt", 0.01, "Min lambda qt value (AP plot) (GeV/c)"};
-  Configurable<float> LambdaMaxqt{"LambdaMaxqt", 0.17, "Max lambda qt value (AP plot) (GeV/c)"};
-  Configurable<float> LambdaMinalpha{"LambdaMinalpha", 0.2, "Min lambda alpha absolute value (AP plot)"};
-  Configurable<float> LambdaMaxalpha{"LambdaMaxalpha", 0.9, "Max lambda alpha absolute value (AP plot)"};
-  Configurable<float> Lambdav0cospa{"Lambdav0cospa", 0.90, "Min V0 CosPA"};
+  Configurable<float> LambdaMinQt{"LambdaMinQt", 0.01, "Min lambda qt value (AP plot) (GeV/c)"};
+  Configurable<float> LambdaMaxQt{"LambdaMaxQt", 0.17, "Max lambda qt value (AP plot) (GeV/c)"};
+  Configurable<float> LambdaMinAlpha{"LambdaMinAlpha", 0.2, "Min lambda alpha absolute value (AP plot)"};
+  Configurable<float> LambdaMaxAlpha{"LambdaMaxAlpha", 0.9, "Max lambda alpha absolute value (AP plot)"};
+  Configurable<float> LambdaMinv0cospa{"LambdaMinv0cospa", 0.95, "Min V0 CosPA"};
   Configurable<float> LambdaWindow{"LambdaWindow", 0.01, "Mass window around expected (in GeV/c2)"};
 
   //// Photon standard criteria:
-  Configurable<float> PhotonDauPseudoRap{"PhotonDauPseudoRap", 0.9, "Max pseudorapidity of daughter tracks"};
-  Configurable<float> PhotondauMinPt{"PhotondauMinPt", 0.05, "Min daughter pT (GeV/c)"};
-  Configurable<float> Photondcadautopv{"Photondcadautopv", 0.05, "Min DCA daughter To PV (cm)"};
-  Configurable<float> Photondcav0dau{"Photondcav0dau", 1.5, "Max DCA V0 Daughters (cm)"};
-  Configurable<float> PhotonTPCCrossedRows{"PhotonTPCCrossedRows", 30, "Min daughter TPC Crossed Rows"};
+  Configurable<float> PhotonMaxDauPseudoRap{"PhotonMaxDauPseudoRap", 0.9, "Max pseudorapidity of daughter tracks"};
+  Configurable<float> PhotonDauMinPt{"PhotonDauMinPt", 0.05, "Min daughter pT (GeV/c)"};
+  Configurable<float> PhotonMinDCADauToPv{"PhotonMinDCADauToPv", 0.05, "Min DCA daughter To PV (cm)"};
+  Configurable<float> PhotonMaxDCAV0Dau{"PhotonMaxDCAV0Dau", 1.5, "Max DCA V0 Daughters (cm)"};
+  Configurable<float> PhotonMinTPCCrossedRows{"PhotonMinTPCCrossedRows", 55, "Min daughter TPC Crossed Rows"};
   Configurable<float> PhotonMinTPCNSigmas{"PhotonMinTPCNSigmas", -6, "Min TPC NSigmas for daughters"};
   Configurable<float> PhotonMaxTPCNSigmas{"PhotonMaxTPCNSigmas", 7, "Max TPC NSigmas for daughters"};
   Configurable<float> PhotonMinPt{"PhotonMinPt", 0.02, "Min photon pT (GeV/c)"};
   Configurable<float> PhotonMaxPt{"PhotonMaxPt", 50.0, "Max photon pT (GeV/c)"};
-  Configurable<float> PhotonPseudoRap{"PhotonPseudoRap", 0.9, "Max photon pseudorapidity"};
+  Configurable<float> PhotonMaxPseudoRap{"PhotonMaxPseudoRap", 0.9, "Max photon pseudorapidity"};
   Configurable<float> PhotonMinRadius{"PhotonMinRadius", 1.0, "Min photon conversion radius (cm)"};
   Configurable<float> PhotonMaxRadius{"PhotonMaxRadius", 180, "Max photon conversion radius (cm)"};
   Configurable<float> PhotonMaxZ{"PhotonMaxZ", 240, "Max photon conversion point z value (cm)"};
-  Configurable<float> PhotonMaxqt{"PhotonMaxqt", 0.06, "Max photon qt value (AP plot) (GeV/c)"};
-  Configurable<float> PhotonMaxalpha{"PhotonMaxalpha", 0.95, "Max photon alpha absolute value (AP plot)"};
-  Configurable<float> Photonv0cospa{"Photonv0cospa", 0.98, "Min V0 CosPA"};
+  Configurable<float> PhotonMaxQt{"PhotonMaxQt", 0.06, "Max photon qt value (AP plot) (GeV/c)"};
+  Configurable<float> PhotonMaxAlpha{"PhotonMaxAlpha", 0.95, "Max photon alpha absolute value (AP plot)"};
+  Configurable<float> PhotonMinV0cospa{"PhotonMinV0cospa", 0.95, "Min V0 CosPA"};
   Configurable<float> PhotonMaxMass{"PhotonMaxMass", 0.1, "Max photon mass (GeV/c^{2})"};
   // TODO: Include PsiPair selection
 
@@ -158,6 +158,7 @@ struct sigmaanalysis {
     // histos.add("GeneralQA/h2dNegativeITSvsTPCpts", "h2dNegativeITSvsTPCpts", kTH2F, {axisTPCrows, axisITSclus});
     histos.add("GeneralQA/h2dArmenterosAll", "h2dArmenterosAll", {HistType::kTH2F, {axisAPAlpha, axisAPQt}});
     histos.add("GeneralQA/h2dArmenterosSelected", "h2dArmenterosSelected", {HistType::kTH2F, {axisAPAlpha, axisAPQt}});
+    histos.add("GeneralQA/hMassSigma0All", "hMassSigma0All", kTH1F, {axisSigmaMass});
 
     // Sigma0 QA
     histos.add("Sigma0/hMassSigma0", "hMassSigma0", kTH1F, {axisSigmaMass});
@@ -219,14 +220,11 @@ struct sigmaanalysis {
       histos.add("GeneralQA/h2dMCArmenterosSelected", "h2dMCArmenterosSelected", {HistType::kTH2F, {axisAPAlpha, axisAPQt}});
 
       // Sigma0 QA
+      histos.add("GeneralQA/hMCMassSigma0All", "hMCMassSigma0All", kTH1F, {axisSigmaMass});
+      histos.add("GeneralQA/hMCPtSigma0All", "hMCPtSigma0All", kTH1F, {axisPt});
       histos.add("Sigma0/hMCMassSigma0", "hMCMassSigma0", kTH1F, {axisSigmaMass});
       histos.add("Sigma0/hMCPtSigma0", "hMCPtSigma0", kTH1F, {axisPt});
     }
-    // if (doprocessCounterQA) {
-    //   histos.add("hGammaIndices", "hGammaIndices", {HistType::kTH1F, {{4000, 0.0f, 400000.0f}}});
-    //   histos.add("hCollIndices", "hCollIndices", {HistType::kTH1F, {{4000, 0.0f, 4000.0f}}});
-    //   histos.add("h2dIndices", "h2dIndices", {HistType::kTH2F, {{4000, 0.0f, 40000.0f}, {4000, 0.0f, 400000.0f}}});
-    // }
   }
 
   // Apply selections in sigma candidates
@@ -251,15 +249,15 @@ struct sigmaanalysis {
     } else {
       if (TMath::Abs(cand.photonMass()) > PhotonMaxMass)
         return false;
-      if ((TMath::Abs(cand.photonPosEta()) > PhotonDauPseudoRap) || (TMath::Abs(cand.photonNegEta()) > PhotonDauPseudoRap))
+      if ((TMath::Abs(cand.photonPosEta()) > PhotonMaxDauPseudoRap) || (TMath::Abs(cand.photonNegEta()) > PhotonMaxDauPseudoRap))
         return false;
-      if ((cand.photonPosPt() < PhotondauMinPt) || (cand.photonNegPt() < PhotondauMinPt))
+      if ((cand.photonPosPt() < PhotonDauMinPt) || (cand.photonNegPt() < PhotonDauMinPt))
         return false;
-      if ((cand.photonDCAPosPV() > Photondcadautopv) || (cand.photonDCANegPV() > Photondcadautopv))
+      if ((cand.photonDCAPosPV() < PhotonMinDCADauToPv) || (cand.photonDCANegPV() < PhotonMinDCADauToPv))
         return false;
-      if (cand.photonDCADau() > Photondcav0dau)
+      if (cand.photonDCADau() > PhotonMaxDCAV0Dau)
         return false;
-      if ((cand.photonPosTPCCrossedRows() < PhotonTPCCrossedRows) || (cand.photonPosTPCCrossedRows() < PhotonTPCCrossedRows))
+      if ((cand.photonPosTPCCrossedRows() < PhotonMinTPCCrossedRows) || (cand.photonNegTPCCrossedRows() < PhotonMinTPCCrossedRows))
         return false;
       if ((cand.photonPosTPCNSigma() < PhotonMinTPCNSigmas) || (cand.photonPosTPCNSigma() > PhotonMaxTPCNSigmas))
         return false;
@@ -267,33 +265,33 @@ struct sigmaanalysis {
         return false;
       if ((cand.photonPt() < PhotonMinPt) || (cand.photonPt() > PhotonMaxPt))
         return false;
-      if (TMath::Abs(cand.photonEta()) < PhotonPseudoRap)
+      if (TMath::Abs(cand.photonEta()) < PhotonMaxPseudoRap)
         return false;
       if ((cand.photonRadius() < PhotonMinRadius) || (cand.photonRadius() > PhotonMaxRadius))
         return false;
       if (TMath::Abs(cand.photonZconv()) > PhotonMaxZ)
         return false;
-      if (cand.photonQt() > PhotonMaxqt)
+      if (cand.photonQt() > PhotonMaxQt)
         return false;
-      if (TMath::Abs(cand.photonAlpha()) > PhotonMaxalpha)
+      if (TMath::Abs(cand.photonAlpha()) > PhotonMaxAlpha)
         return false;
-      if (cand.photonCosPA() < Photonv0cospa)
+      if (cand.photonCosPA() < PhotonMinV0cospa)
         return false;
 
       // Lambda selection
       if (TMath::Abs(cand.lambdaMass() - 1.115683) > LambdaWindow)
         return false;
-      if ((cand.lambdaDCAPosPV() < Lambdadcapostopv) || (cand.lambdaDCANegPV() < Lambdadcanegtopv))
+      if ((cand.lambdaDCAPosPV() < LambdaMinDCAPosToPv) || (cand.lambdaDCANegPV() < LambdaMinDCANegToPv))
         return false;
       if ((cand.lambdaRadius() < LambdaMinv0radius) || (cand.lambdaRadius() > LambdaMaxv0radius))
         return false;
-      if (cand.lambdaDCADau() > Lambdadcav0dau)
+      if (cand.lambdaDCADau() > LambdaMaxDCAV0Dau)
         return false;
-      if ((cand.lambdaQt() < LambdaMinqt) || (cand.lambdaQt() > LambdaMaxqt))
+      if ((cand.lambdaQt() < LambdaMinQt) || (cand.lambdaQt() > LambdaMaxQt))
         return false;
-      if (TMath::Abs(cand.lambdaAlpha()) > PhotonMaxalpha)
+      if ((TMath::Abs(cand.lambdaAlpha()) < LambdaMinAlpha) || (TMath::Abs(cand.lambdaAlpha()) > LambdaMaxAlpha))
         return false;
-      if (cand.lambdaCosPA() < Lambdav0cospa)
+      if (cand.lambdaCosPA() < LambdaMinv0cospa)
         return false;
     }
 
@@ -317,6 +315,8 @@ struct sigmaanalysis {
       if (sigma.isSigma()) {
         histos.fill(HIST("GeneralQA/h2dMCArmenterosAll"), sigma.photonAlpha(), sigma.photonQt());
         histos.fill(HIST("GeneralQA/h2dMCArmenterosAll"), sigma.lambdaAlpha(), sigma.lambdaQt());
+        histos.fill(HIST("GeneralQA/hMCMassSigma0All"), sigma.sigmaMass());
+        histos.fill(HIST("GeneralQA/hMCPtSigma0All"), sigma.sigmapT());
 
         if (!processSigmaCandidate(sigma))
           continue;
@@ -338,6 +338,7 @@ struct sigmaanalysis {
     for (auto& sigma : v0s) { // selecting Sigma0-like candidates
       histos.fill(HIST("GeneralQA/h2dArmenterosAll"), sigma.photonAlpha(), sigma.photonQt());
       histos.fill(HIST("GeneralQA/h2dArmenterosAll"), sigma.lambdaAlpha(), sigma.lambdaQt());
+      histos.fill(HIST("GeneralQA/hMassSigma0All"), sigma.sigmaMass());
 
       nSigmaCandidates++;
       if (nSigmaCandidates % 50000 == 0) {
@@ -351,14 +352,16 @@ struct sigmaanalysis {
 
       histos.fill(HIST("Sigma0/hMassSigma0"), sigma.sigmaMass());
       histos.fill(HIST("Sigma0/hPtSigma0"), sigma.sigmapT());
-      histos.fill(HIST("Sigma0/hRapiditySigma0"), sigma.sigmaRapidity());
-
+      histos.fill(HIST("Sigma0/hRapiditySigma0"), sigma.sigmaRapidity());  
       histos.fill(HIST("h3dMassSigma0"), coll.centFT0C(), sigma.sigmapT(), sigma.sigmaMass());
+
+      histos.fill(HIST("Gamma/hMassGamma"), sigma.lambdaMass());
+      histos.fill(HIST("Lambda/hMassLambda"), sigma.photonMass());
     }
   }
 
   // PROCESS_SWITCH(sigmaanalysis, processCounterQA, "Check standard counter correctness", true);
-  PROCESS_SWITCH(sigmaanalysis, processMonteCarlo, "Do Monte-Carlo-based analysis", true);
+  PROCESS_SWITCH(sigmaanalysis, processMonteCarlo, "Do Monte-Carlo-based analysis", false);
   PROCESS_SWITCH(sigmaanalysis, processRealData, "Do real data analysis", true);
 };
 
