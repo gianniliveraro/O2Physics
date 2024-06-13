@@ -87,20 +87,20 @@ struct sigma0builder {
   // For standard approach:
   //// Lambda criteria:
   Configurable<float> LambdaDauPseudoRap{"LambdaDauPseudoRap", 1.0, "Max pseudorapidity of daughter tracks"};
-  Configurable<float> LambdaMaxDCANegToPv{"LambdaMaxDCANegToPv", .01, "min DCA Neg To PV (cm)"};
-  Configurable<float> LambdaMaxDCAPosToPv{"LambdaMaxDCAPosToPv", .01, "min DCA Pos To PV (cm)"};
-  Configurable<float> LambdaMaxDCAV0Dau{"LambdaMaxDCAV0Dau", 2.5, "Max DCA V0 Daughters (cm)"};
+  Configurable<float> LambdaMinDCANegToPv{"LambdaMinDCANegToPv", .01, "min DCA Neg To PV (cm)"};
+  Configurable<float> LambdaMinDCAPosToPv{"LambdaMinDCAPosToPv", .01, "min DCA Pos To PV (cm)"};
+  Configurable<float> LambdaMaxDCAV0Dau{"LambdaMaxDCAV0Dau", 3.5, "Max DCA V0 Daughters (cm)"};
   Configurable<float> LambdaMinv0radius{"LambdaMinv0radius", 0.1, "Min V0 radius (cm)"};
   Configurable<float> LambdaMaxv0radius{"LambdaMaxv0radius", 200, "Max V0 radius (cm)"};
   Configurable<float> LambdaWindow{"LambdaWindow", 0.01, "Mass window around expected (in GeV/c2)"};
 
   //// Photon criteria:
   Configurable<float> PhotonMaxDauPseudoRap{"PhotonMaxDauPseudoRap", 1.0, "Max pseudorapidity of daughter tracks"};
-  Configurable<float> PhotonMaxDCAToPv{"PhotonMaxDCAToPv", 0.01, "Min DCA daughter To PV (cm)"};
+  Configurable<float> PhotonMinDCAToPv{"PhotonMinDCAToPv", 0.001, "Min DCA daughter To PV (cm)"};
   Configurable<float> PhotonMaxDCAV0Dau{"PhotonMaxDCAV0Dau", 3.0, "Max DCA V0 Daughters (cm)"};
   Configurable<float> PhotonMinRadius{"PhotonMinRadius", 0.5, "Min photon conversion radius (cm)"};
   Configurable<float> PhotonMaxRadius{"PhotonMaxRadius", 250, "Max photon conversion radius (cm)"};
-  Configurable<float> PhotonMaxMass{"PhotonMaxMass", 0.2, "Max photon mass (GeV/c^{2})"};
+  Configurable<float> PhotonMaxMass{"PhotonMaxMass", 0.3, "Max photon mass (GeV/c^{2})"};
 
   //// Sigma0 criteria:
   Configurable<float> Sigma0Window{"Sigma0Window", 0.05, "Mass window around expected (in GeV/c2)"};
@@ -144,7 +144,7 @@ struct sigma0builder {
         return false;
       if ((TMath::Abs(gamma.negativeeta()) > PhotonMaxDauPseudoRap) || (TMath::Abs(gamma.positiveeta()) > PhotonMaxDauPseudoRap))
         return false;
-      if ((gamma.dcapostopv() > PhotonMaxDCAToPv) || (gamma.dcanegtopv() > PhotonMaxDCAToPv))
+      if ((gamma.dcapostopv() < PhotonMinDCAToPv) || (gamma.dcanegtopv() < PhotonMinDCAToPv))
         return false;
       if (gamma.dcaV0daughters() > PhotonMaxDCAV0Dau)
         return false;
@@ -156,7 +156,7 @@ struct sigma0builder {
         return false;
       if ((TMath::Abs(lambda.negativeeta()) > LambdaDauPseudoRap) || (TMath::Abs(lambda.positiveeta()) > LambdaDauPseudoRap))
         return false;
-      if ((lambda.dcapostopv() < LambdaMaxDCAPosToPv) || (lambda.dcanegtopv() < LambdaMaxDCANegToPv))
+      if ((lambda.dcapostopv() < LambdaMinDCAPosToPv) || (lambda.dcanegtopv() < LambdaMinDCANegToPv))
         return false;
       if ((lambda.v0radius() < LambdaMinv0radius) || (lambda.v0radius() > LambdaMaxv0radius))
         return false;
@@ -207,7 +207,7 @@ struct sigma0builder {
     sigmaCandidate.mass = RecoDecay::m(arrMom, std::array{o2::constants::physics::MassPhoton, o2::constants::physics::MassLambda0});
     sigmaCandidate.pT = RecoDecay::pt(array{gamma.px() + lambda.px(), gamma.py() + lambda.py()});
     sigmaCandidate.Rapidity = RecoDecay::y(std::array{gamma.px() + lambda.px(), gamma.py() + lambda.py(), gamma.pz() + lambda.pz()}, o2::constants::physics::MassSigma0);
-    
+
     // Sigma related
     float fSigmapT = sigmaCandidate.pT;
     float fSigmaMass = sigmaCandidate.mass;

@@ -80,7 +80,7 @@ struct sigmaanalysis {
   //// Lambda standard criteria::
   Configurable<float> LambdaMinDCANegToPv{"LambdaMinDCANegToPv", .05, "min DCA Neg To PV (cm)"};
   Configurable<float> LambdaMinDCAPosToPv{"LambdaMinDCAPosToPv", .05, "min DCA Pos To PV (cm)"};
-  Configurable<float> LambdaMaxDCAV0Dau{"LambdaMaxDCAV0Dau", 1.5, "Max DCA V0 Daughters (cm)"};
+  Configurable<float> LambdaMaxDCAV0Dau{"LambdaMaxDCAV0Dau", 2.5, "Max DCA V0 Daughters (cm)"};
   Configurable<float> LambdaMinv0radius{"LambdaMinv0radius", 0.5, "Min V0 radius (cm)"};
   Configurable<float> LambdaMaxv0radius{"LambdaMaxv0radius", 180, "Max V0 radius (cm)"};
   Configurable<float> LambdaMinQt{"LambdaMinQt", 0.01, "Min lambda qt value (AP plot) (GeV/c)"};
@@ -94,20 +94,20 @@ struct sigmaanalysis {
   Configurable<float> PhotonMaxDauPseudoRap{"PhotonMaxDauPseudoRap", 0.9, "Max pseudorapidity of daughter tracks"};
   Configurable<float> PhotonDauMinPt{"PhotonDauMinPt", 0.05, "Min daughter pT (GeV/c)"};
   Configurable<float> PhotonMinDCADauToPv{"PhotonMinDCADauToPv", 0.05, "Min DCA daughter To PV (cm)"};
-  Configurable<float> PhotonMaxDCAV0Dau{"PhotonMaxDCAV0Dau", 1.5, "Max DCA V0 Daughters (cm)"};
+  Configurable<float> PhotonMaxDCAV0Dau{"PhotonMaxDCAV0Dau", 2.5, "Max DCA V0 Daughters (cm)"};
   Configurable<float> PhotonMinTPCCrossedRows{"PhotonMinTPCCrossedRows", 55, "Min daughter TPC Crossed Rows"};
   Configurable<float> PhotonMinTPCNSigmas{"PhotonMinTPCNSigmas", -6, "Min TPC NSigmas for daughters"};
   Configurable<float> PhotonMaxTPCNSigmas{"PhotonMaxTPCNSigmas", 7, "Max TPC NSigmas for daughters"};
   Configurable<float> PhotonMinPt{"PhotonMinPt", 0.02, "Min photon pT (GeV/c)"};
   Configurable<float> PhotonMaxPt{"PhotonMaxPt", 50.0, "Max photon pT (GeV/c)"};
   Configurable<float> PhotonMaxPseudoRap{"PhotonMaxPseudoRap", 0.9, "Max photon pseudorapidity"};
-  Configurable<float> PhotonMinRadius{"PhotonMinRadius", 1.0, "Min photon conversion radius (cm)"};
+  Configurable<float> PhotonMinRadius{"PhotonMinRadius", 0.5, "Min photon conversion radius (cm)"};
   Configurable<float> PhotonMaxRadius{"PhotonMaxRadius", 180, "Max photon conversion radius (cm)"};
   Configurable<float> PhotonMaxZ{"PhotonMaxZ", 240, "Max photon conversion point z value (cm)"};
   Configurable<float> PhotonMaxQt{"PhotonMaxQt", 0.06, "Max photon qt value (AP plot) (GeV/c)"};
   Configurable<float> PhotonMaxAlpha{"PhotonMaxAlpha", 0.95, "Max photon alpha absolute value (AP plot)"};
-  Configurable<float> PhotonMinV0cospa{"PhotonMinV0cospa", 0.95, "Min V0 CosPA"};
-  Configurable<float> PhotonMaxMass{"PhotonMaxMass", 0.1, "Max photon mass (GeV/c^{2})"};
+  Configurable<float> PhotonMinV0cospa{"PhotonMinV0cospa", 0.90, "Min V0 CosPA"};
+  Configurable<float> PhotonMaxMass{"PhotonMaxMass", 0.15, "Max photon mass (GeV/c^{2})"};
   // TODO: Include PsiPair selection
 
   // Axis
