@@ -114,6 +114,17 @@ struct sigma0builder {
   {
     // Event counter
     histos.add("hEventVertexZ", "hEventVertexZ", kTH1F, {vertexZ});
+    histos.add("hCandidateBuilderSelection", "hCandidateBuilderSelection", kTH1F, {{11, -0.5f, +10.5f}});
+    histos.get<TH1>(HIST("hCandidateBuilderSelection"))->GetXaxis()->SetBinLabel(1, "Photon Mass Cut");
+    histos.get<TH1>(HIST("hCandidateBuilderSelection"))->GetXaxis()->SetBinLabel(2, "Photon DauEta Cut");
+    histos.get<TH1>(HIST("hCandidateBuilderSelection"))->GetXaxis()->SetBinLabel(3, "Photon DCAToPV Cut");
+    histos.get<TH1>(HIST("hCandidateBuilderSelection"))->GetXaxis()->SetBinLabel(4, "Photon DCADau Cut");
+    histos.get<TH1>(HIST("hCandidateBuilderSelection"))->GetXaxis()->SetBinLabel(5, "Photon Radius Cut");
+    histos.get<TH1>(HIST("hCandidateBuilderSelection"))->GetXaxis()->SetBinLabel(6, "Lambda Mass Cut");
+    histos.get<TH1>(HIST("hCandidateBuilderSelection"))->GetXaxis()->SetBinLabel(7, "Lambda DauEta Cut");
+    histos.get<TH1>(HIST("hCandidateBuilderSelection"))->GetXaxis()->SetBinLabel(8, "Lambda DCAToPV Cut");
+    histos.get<TH1>(HIST("hCandidateBuilderSelection"))->GetXaxis()->SetBinLabel(9, "Lambda Radius Cut");
+    histos.get<TH1>(HIST("hCandidateBuilderSelection"))->GetXaxis()->SetBinLabel(10, "Lambda DCADau Cut");
   }
 
   // Process sigma candidate and store properties in object
@@ -142,26 +153,36 @@ struct sigma0builder {
       // Gamma basic selection criteria:
       if (TMath::Abs(gamma.mGamma()) > PhotonMaxMass)
         return false;
+      histos.fill(HIST("hCandidateBuilderSelection"), 0.);
       if ((TMath::Abs(gamma.negativeeta()) > PhotonMaxDauPseudoRap) || (TMath::Abs(gamma.positiveeta()) > PhotonMaxDauPseudoRap))
         return false;
-      if ((gamma.dcapostopv() < PhotonMinDCAToPv) || (gamma.dcanegtopv() < PhotonMinDCAToPv))
+      histos.fill(HIST("hCandidateBuilderSelection"), 1.);
+      if ((TMath::Abs(gamma.dcapostopv()) < PhotonMinDCAToPv) || (TMath::Abs(gamma.dcanegtopv()) < PhotonMinDCAToPv))
         return false;
-      if (gamma.dcaV0daughters() > PhotonMaxDCAV0Dau)
+      histos.fill(HIST("hCandidateBuilderSelection"), 2.);
+      if (TMath::Abs(gamma.dcaV0daughters()) > PhotonMaxDCAV0Dau)
         return false;
+      histos.fill(HIST("hCandidateBuilderSelection"), 3.);
       if ((gamma.v0radius() < PhotonMinRadius) || (gamma.v0radius() > PhotonMaxRadius))
         return false;
+      histos.fill(HIST("hCandidateBuilderSelection"), 4.);
 
       // Lambda basic selection criteria:
       if (TMath::Abs(lambda.mLambda() - 1.115683) > LambdaWindow)
         return false;
+      histos.fill(HIST("hCandidateBuilderSelection"), 5.);
       if ((TMath::Abs(lambda.negativeeta()) > LambdaDauPseudoRap) || (TMath::Abs(lambda.positiveeta()) > LambdaDauPseudoRap))
         return false;
-      if ((lambda.dcapostopv() < LambdaMinDCAPosToPv) || (lambda.dcanegtopv() < LambdaMinDCANegToPv))
+      histos.fill(HIST("hCandidateBuilderSelection"), 6.);
+      if ((TMath::Abs(lambda.dcapostopv()) < LambdaMinDCAPosToPv) || (TMath::Abs(lambda.dcanegtopv()) < LambdaMinDCANegToPv))
         return false;
+      histos.fill(HIST("hCandidateBuilderSelection"), 7.);
       if ((lambda.v0radius() < LambdaMinv0radius) || (lambda.v0radius() > LambdaMaxv0radius))
         return false;
+      histos.fill(HIST("hCandidateBuilderSelection"), 8.);
       if (lambda.dcaV0daughters() > LambdaMaxDCAV0Dau)
         return false;
+      histos.fill(HIST("hCandidateBuilderSelection"), 9.);
     }
     // Sigma0 candidate properties
     std::array<float, 3> pVecPhotons{gamma.px(), gamma.py(), gamma.pz()};
