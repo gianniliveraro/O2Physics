@@ -132,6 +132,11 @@ struct findableStudy {
 
     // Acceptably (for svertexer) tracked
     histos.add("h2dPtVsCentrality_AcceptablyTracked", "h2dPtVsCentrality_AcceptablyTracked", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_AcceptTracked_ITSOnly", "h2dPtVsCentrality_AcceptTracked_ITSOnly", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_AcceptTracked_TPCOnly", "h2dPtVsCentrality_AcceptTracked_TPCOnly", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_AcceptTracked_ITSTPC", "h2dPtVsCentrality_AcceptTracked_ITSTPC", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_AcceptTracked_TPCTOF", "h2dPtVsCentrality_AcceptTracked_TPCTOF", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_AcceptTracked_TPCTRD", "h2dPtVsCentrality_AcceptTracked_TPCTRD", kTH2D, {axisCentrality, axisPt});
 
     // Found in any capacity, including ITSonly
     histos.add("h2dPtVsCentrality_FoundAny", "h2dPtVsCentrality_FoundAny", kTH2D, {axisCentrality, axisPt});
@@ -258,6 +263,11 @@ struct findableStudy {
     bool hasBeenAcceptablyTracked = false;
     bool hasBeenFoundAny = false;
     bool hasBeenFound = false;
+    bool hasBeenAcceptablyTracked_ITSOnly = false;
+    bool hasBeenAcceptablyTracked_TPCOnly = false;
+    bool hasBeenAcceptablyTracked_ITSTPC = false;
+    bool hasBeenAcceptablyTracked_TPCTOF = false;
+    bool hasBeenAcceptablyTracked_TPCTRD = false; 
     int nCandidatesWithTPC = 0;
 
     for (auto& recv0 : recv0s) {
@@ -276,6 +286,14 @@ struct findableStudy {
 
       // define properties for this V0
       bool pTrackOK = false, nTrackOK = false; // tracks are acceptably tracked
+
+      // tracks detailed info
+      bool pTrack_isITSonly = false, nTrack_isITSonly = false; 
+      bool pTrack_isTPConly = false, nTrack_isTPConly = false;
+      bool pTrack_isITSTPC = false, nTrack_isITSTPC = false;
+      bool pTrack_isTPCTRD = false, nTrack_isTPCTRD = false;
+      bool pTrack_isTPCTOF = false, nTrack_isTPCTOF = false;
+      
 
       // Detailed analysis level
       bool topoV0RadiusOK = false, topoV0RadiusMaxOK = false, topoV0CosPAOK = false, topoDcaPosToPVOK = false, topoDcaNegToPVOK = false, topoDcaV0DauOK = false;
@@ -311,10 +329,37 @@ struct findableStudy {
           (!nTrack.hasTPC() && nTrack.itsNCls() >= 6)) {
           nTrackOK = true; // for this V0 only
         }
-
         if (pTrackOK && nTrackOK)
           hasBeenAcceptablyTracked = true;
 
+        // Getting tracking properties
+        pTrack_isITSonly = pTrack.hasITS() && !pTrack.hasTPC();
+        nTrack_isITSonly = nTrack.hasITS() && !nTrack.hasTPC();
+        pTrack_isTPConly = !pTrack.hasITS() && pTrack.hasTPC();
+        nTrack_isTPConly = !nTrack.hasITS() && nTrack.hasTPC();
+        pTrack_isITSTPC = pTrack.hasITS() && pTrack.hasTPC();      
+        nTrack_isITSTPC = nTrack.hasITS() && nTrack.hasTPC();
+        pTrack_isTPCTRD = pTrack.hasTPC() && pTrack.hasTRD();      
+        nTrack_isTPCTRD = nTrack.hasTPC() && nTrack.hasTRD();
+        pTrack_isTPCTOF = pTrack.hasTPC() && pTrack.hasTOF();      
+        nTrack_isTPCTOF = nTrack.hasTPC() && nTrack.hasTOF();
+
+        if (pTrack_isITSonly && nTrack_isITSonly){
+          hasBeenAcceptablyTracked_ITSOnly = true;
+        }
+        if (pTrack_isTPConly && nTrack_isTPConly){
+          hasBeenAcceptablyTracked_TPCOnly = true;
+        }
+        if (pTrack_isITSTPC && nTrack_isITSTPC){
+          hasBeenAcceptablyTracked_ITSTPC = true;
+        }
+        if (pTrack_isTPCTOF && nTrack_isTPCTOF){
+          hasBeenAcceptablyTracked_TPCTOF = true;
+        }
+        if (pTrack_isTPCTRD && nTrack_isTPCTRD){
+          hasBeenAcceptablyTracked_TPCTRD = true;
+        }
+        
         // cross-check correctness of new getter
         if (pTrack.hasITSTracker() && (pTrack.hasITS() && pTrack.itsChi2PerNcl() < -1e-3)) {
           LOGF(fatal, "Positive track: inconsistent outcome of ITS tracker getter and explicit check!");
@@ -456,6 +501,21 @@ struct findableStudy {
     }
     if (hasWrongCollision) {
       histos.fill(HIST("hNRecoV0sWrongColl"), recv0s.size());
+    }
+    if (hasBeenAcceptablyTracked_ITSOnly){
+      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_ITSOnly"), centrality, ptmc);
+    }
+    if (hasBeenAcceptablyTracked_TPCOnly){
+      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_TPCOnly"), centrality, ptmc);
+    }
+    if (hasBeenAcceptablyTracked_ITSTPC){
+      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_ITSTPC"), centrality, ptmc);
+    }
+    if (hasBeenAcceptablyTracked_TPCTOF){
+      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_TPCTOF"), centrality, ptmc);
+    }
+    if (hasBeenAcceptablyTracked_TPCTRD){
+      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_TPCTRD"), centrality, ptmc);   
     }
   }
 
