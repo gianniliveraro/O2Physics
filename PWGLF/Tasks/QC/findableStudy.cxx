@@ -77,9 +77,12 @@ struct findableStudy {
   // master PDG code selection
   Configurable<int> pdgCode{"pdgCode", 310, "PDG code to select"};
   Configurable<bool> skipITSonly{"skipITSonly", true, "skip reco V0s if an ITS-only (no TPC) prong present"};
+  Configurable<bool> selStandardV0{"selStandardV0", true, "skip anything other than a standard V0 (V0Type==1)"};
 
   ConfigurableAxis axisPt{"axisPt", {VARIABLE_WIDTH, 0.0f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 1.9f, 2.0f, 2.2f, 2.4f, 2.6f, 2.8f, 3.0f, 3.2f, 3.4f, 3.6f, 3.8f, 4.0f, 4.4f, 4.8f, 5.2f, 5.6f, 6.0f, 6.5f, 7.0f, 7.5f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 17.0f, 19.0f, 21.0f, 23.0f, 25.0f, 30.0f, 35.0f, 40.0f, 50.0f}, "pt axis for analysis"};
   ConfigurableAxis axisCentrality{"axisCentrality", {VARIABLE_WIDTH, 0.0f, 5.0f, 10.0f, 20.0f, 30.0f, 40.0f, 50.0f, 60.0f, 70.0f, 80.0f, 90.0f}, "Centrality"};
+  ConfigurableAxis axisV0Radius{"axisV0Radius", {180, 0.0f, 180.0f}, "V0 2D radius (cm)"};
+  ConfigurableAxis axisDCAdau{"axisDCAdau", {20, 0.0f, 2.0f}, "DCA (cm)"};
 
   // +-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+
   // Full wrapper for configurables related to actual analysis
@@ -132,11 +135,26 @@ struct findableStudy {
 
     // Acceptably (for svertexer) tracked
     histos.add("h2dPtVsCentrality_AcceptablyTracked", "h2dPtVsCentrality_AcceptablyTracked", kTH2D, {axisCentrality, axisPt});
-    histos.add("h2dPtVsCentrality_AcceptTracked_ITSOnly", "h2dPtVsCentrality_AcceptTracked_ITSOnly", kTH2D, {axisCentrality, axisPt});
-    histos.add("h2dPtVsCentrality_AcceptTracked_TPCOnly", "h2dPtVsCentrality_AcceptTracked_TPCOnly", kTH2D, {axisCentrality, axisPt});
-    histos.add("h2dPtVsCentrality_AcceptTracked_ITSTPC", "h2dPtVsCentrality_AcceptTracked_ITSTPC", kTH2D, {axisCentrality, axisPt});
-    histos.add("h2dPtVsCentrality_AcceptTracked_TPCTOF", "h2dPtVsCentrality_AcceptTracked_TPCTOF", kTH2D, {axisCentrality, axisPt});
-    histos.add("h2dPtVsCentrality_AcceptTracked_TPCTRD", "h2dPtVsCentrality_AcceptTracked_TPCTRD", kTH2D, {axisCentrality, axisPt});
+    histos.add("h3dPtVsCentrality_AcceptTracked_ITSOnly", "h3dPtVsCentrality_AcceptTracked_ITSOnly", kTH3D, {axisCentrality, axisPt, {2, -0.5, 1.5f}});
+    histos.add("h3dPtVsCentrality_AcceptTracked_TPCOnly", "h3dPtVsCentrality_AcceptTracked_TPCOnly", kTH3D, {axisCentrality, axisPt, {2, -0.5, 1.5f}});
+    histos.add("h3dPtVsCentrality_AcceptTracked_ITSTPC", "h3dPtVsCentrality_AcceptTracked_ITSTPC", kTH3D, {axisCentrality, axisPt, {2, -0.5, 1.5f}});
+    histos.add("h3dPtVsCentrality_AcceptTracked_TPCTOF", "h3dPtVsCentrality_AcceptTracked_TPCTOF", kTH3D, {axisCentrality, axisPt, {2, -0.5, 1.5f}});
+    histos.add("h3dPtVsCentrality_AcceptTracked_TPCTRD", "h3dPtVsCentrality_AcceptTracked_TPCTRD", kTH3D, {axisCentrality, axisPt, {2, -0.5, 1.5f}});
+
+    // Topological analysis of Acceptably tracked
+    // Radius
+    histos.add("h3dPtVsCentralityRadius_ITSOnly", "h3dPtVsCentralityRadius_ITSOnly", kTH3F, {axisCentrality, axisPt, axisV0Radius});
+    histos.add("h3dPtVsCentralityRadius_TPCOnly", "h3dPtVsCentralityRadius_TPCOnly", kTH3F, {axisCentrality, axisPt, axisV0Radius});
+    histos.add("h3dPtVsCentralityRadius_ITSTPC", "h3dPtVsCentralityRadius_ITSTPC", kTH3F, {axisCentrality, axisPt, axisV0Radius});
+    histos.add("h3dPtVsCentralityRadius_TPCTOF", "h3dPtVsCentralityRadius_TPCTOF", kTH3F, {axisCentrality, axisPt, axisV0Radius});
+    histos.add("h3dPtVsCentralityRadius_TPCTRD", "h3dPtVsCentralityRadius_TPCTRD", kTH3F, {axisCentrality, axisPt, axisV0Radius});
+
+    // DCADau
+    histos.add("h3dPtVsCentralityDCADau_ITSOnly", "h3dPtVsCentralityDCADau_ITSOnly", kTH3F, {axisCentrality, axisPt, axisDCAdau});
+    histos.add("h3dPtVsCentralityDCADau_TPCOnly", "h3dPtVsCentralityDCADau_TPCOnly", kTH3F, {axisCentrality, axisPt, axisDCAdau});
+    histos.add("h3dPtVsCentralityDCADau_ITSTPC", "h3dPtVsCentralityDCADau_ITSTPC", kTH3F, {axisCentrality, axisPt, axisDCAdau});
+    histos.add("h3dPtVsCentralityDCADau_TPCTOF", "h3dPtVsCentralityDCADau_TPCTOF", kTH3F, {axisCentrality, axisPt, axisDCAdau});
+    histos.add("h3dPtVsCentralityDCADau_TPCTRD", "h3dPtVsCentralityDCADau_TPCTRD", kTH3F, {axisCentrality, axisPt, axisDCAdau});
 
     // Found in any capacity, including ITSonly
     histos.add("h2dPtVsCentrality_FoundAny", "h2dPtVsCentrality_FoundAny", kTH2D, {axisCentrality, axisPt});
@@ -268,11 +286,16 @@ struct findableStudy {
     bool hasBeenAcceptablyTracked_ITSTPC = false;
     bool hasBeenAcceptablyTracked_TPCTOF = false;
     bool hasBeenAcceptablyTracked_TPCTRD = false; 
+    bool isCollinear = false;
     int nCandidatesWithTPC = 0;
 
     for (auto& recv0 : recv0s) {
-      if (recv0.v0Type() != 1)
-        continue; // skip anything other than a standard V0
+
+      if (recv0.v0Type() == 0) // skip v0 for cascades analysis
+        continue; 
+
+      if (selStandardV0 && recv0.v0Type() != 1)
+        continue; 
 
       // de-reference daughter track extras
       auto pTrack = recv0.posTrackExtra_as<dauTracks>();
@@ -293,8 +316,10 @@ struct findableStudy {
       bool pTrack_isITSTPC = false, nTrack_isITSTPC = false;
       bool pTrack_isTPCTRD = false, nTrack_isTPCTRD = false;
       bool pTrack_isTPCTOF = false, nTrack_isTPCTOF = false;
-      
 
+      if (recv0.v0Type() & (1 << 2))
+        isCollinear = true;
+      
       // Detailed analysis level
       bool topoV0RadiusOK = false, topoV0RadiusMaxOK = false, topoV0CosPAOK = false, topoDcaPosToPVOK = false, topoDcaNegToPVOK = false, topoDcaV0DauOK = false;
 
@@ -486,10 +511,14 @@ struct findableStudy {
         continue;
       }
     }
+    // Calculate decay radius
+    float V0MCRadius = RecoDecay::sqrtSumOfSquares(v0.xMC(), v0.yMC());
+    // Filling histograms
     histos.fill(HIST("hNRecoV0sWithTPC"), nCandidatesWithTPC);
 
     // Major check 1: Findable versus found in some capacity
     histos.fill(HIST("h2dPtVsCentrality_Findable"), centrality, ptmc);
+
     if (hasBeenAcceptablyTracked) {
       histos.fill(HIST("h2dPtVsCentrality_AcceptablyTracked"), centrality, ptmc);
     }
@@ -502,20 +531,26 @@ struct findableStudy {
     if (hasWrongCollision) {
       histos.fill(HIST("hNRecoV0sWrongColl"), recv0s.size());
     }
+    
     if (hasBeenAcceptablyTracked_ITSOnly){
-      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_ITSOnly"), centrality, ptmc);
+      histos.fill(HIST("h3dPtVsCentrality_AcceptTracked_ITSOnly"), centrality, ptmc, isCollinear);
+      histos.fill(HIST("h3dPtVsCentralityRadius_ITSOnly"), centrality, ptmc, V0MCRadius); 
     }
     if (hasBeenAcceptablyTracked_TPCOnly){
-      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_TPCOnly"), centrality, ptmc);
+      histos.fill(HIST("h3dPtVsCentrality_AcceptTracked_TPCOnly"), centrality, ptmc, isCollinear);
+      histos.fill(HIST("h3dPtVsCentralityRadius_TPCOnly"), centrality, ptmc, V0MCRadius);
     }
     if (hasBeenAcceptablyTracked_ITSTPC){
-      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_ITSTPC"), centrality, ptmc);
+      histos.fill(HIST("h3dPtVsCentrality_AcceptTracked_ITSTPC"), centrality, ptmc, isCollinear);
+      histos.fill(HIST("h3dPtVsCentralityRadius_ITSTPC"), centrality, ptmc, V0MCRadius);
     }
     if (hasBeenAcceptablyTracked_TPCTOF){
-      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_TPCTOF"), centrality, ptmc);
+      histos.fill(HIST("h3dPtVsCentrality_AcceptTracked_TPCTOF"), centrality, ptmc, isCollinear);
+      histos.fill(HIST("h3dPtVsCentralityRadius_TPCTOF"), centrality, ptmc, V0MCRadius);
     }
     if (hasBeenAcceptablyTracked_TPCTRD){
-      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_TPCTRD"), centrality, ptmc);   
+      histos.fill(HIST("h3dPtVsCentrality_AcceptTracked_TPCTRD"), centrality, ptmc, isCollinear);  
+      histos.fill(HIST("h3dPtVsCentralityRadius_TPCTRD"), centrality, ptmc, V0MCRadius); 
     }
   }
 
