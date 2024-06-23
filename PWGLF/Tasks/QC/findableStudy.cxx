@@ -82,7 +82,7 @@ struct findableStudy {
   ConfigurableAxis axisPt{"axisPt", {VARIABLE_WIDTH, 0.0f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 1.9f, 2.0f, 2.2f, 2.4f, 2.6f, 2.8f, 3.0f, 3.2f, 3.4f, 3.6f, 3.8f, 4.0f, 4.4f, 4.8f, 5.2f, 5.6f, 6.0f, 6.5f, 7.0f, 7.5f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 17.0f, 19.0f, 21.0f, 23.0f, 25.0f, 30.0f, 35.0f, 40.0f, 50.0f}, "pt axis for analysis"};
   ConfigurableAxis axisCentrality{"axisCentrality", {VARIABLE_WIDTH, 0.0f, 5.0f, 10.0f, 20.0f, 30.0f, 40.0f, 50.0f, 60.0f, 70.0f, 80.0f, 90.0f}, "Centrality"};
   ConfigurableAxis axisV0Radius{"axisV0Radius", {180, 0.0f, 180.0f}, "V0 2D radius (cm)"};
-  ConfigurableAxis axisDCAdau{"axisDCAdau", {20, 0.0f, 2.0f}, "DCA (cm)"};
+  ConfigurableAxis axisDCAdau{"axisDCAdau", {30, 0.0f, 3.0f}, "DCA (cm)"};
 
   // +-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+
   // Full wrapper for configurables related to actual analysis
@@ -135,11 +135,14 @@ struct findableStudy {
 
     // Acceptably (for svertexer) tracked
     histos.add("h2dPtVsCentrality_AcceptablyTracked", "h2dPtVsCentrality_AcceptablyTracked", kTH2D, {axisCentrality, axisPt});
-    histos.add("h3dPtVsCentrality_AcceptTracked_ITSOnly", "h3dPtVsCentrality_AcceptTracked_ITSOnly", kTH3D, {axisCentrality, axisPt, {2, -0.5, 1.5f}});
-    histos.add("h3dPtVsCentrality_AcceptTracked_TPCOnly", "h3dPtVsCentrality_AcceptTracked_TPCOnly", kTH3D, {axisCentrality, axisPt, {2, -0.5, 1.5f}});
-    histos.add("h3dPtVsCentrality_AcceptTracked_ITSTPC", "h3dPtVsCentrality_AcceptTracked_ITSTPC", kTH3D, {axisCentrality, axisPt, {2, -0.5, 1.5f}});
-    histos.add("h3dPtVsCentrality_AcceptTracked_TPCTOF", "h3dPtVsCentrality_AcceptTracked_TPCTOF", kTH3D, {axisCentrality, axisPt, {2, -0.5, 1.5f}});
-    histos.add("h3dPtVsCentrality_AcceptTracked_TPCTRD", "h3dPtVsCentrality_AcceptTracked_TPCTRD", kTH3D, {axisCentrality, axisPt, {2, -0.5, 1.5f}});
+    histos.add("h2dPtVsCentrality_AcceptTracked_ITSOnly", "h3dPtVsCentrality_AcceptTracked_ITSOnly", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_AcceptTracked_TPCOnly", "h3dPtVsCentrality_AcceptTracked_TPCOnly", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_AcceptTracked_ITSTPC", "h3dPtVsCentrality_AcceptTracked_ITSTPC", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_AcceptTracked_TPCTOF", "h3dPtVsCentrality_AcceptTracked_TPCTOF", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_AcceptTracked_TPCTRD", "h3dPtVsCentrality_AcceptTracked_TPCTRD", kTH2D, {axisCentrality, axisPt});
+
+    // V0Type check
+    histos.add("hv0Type", "hv0Type", kTH1D, {{6, -0.5, 5.5f}});
 
     // Topological analysis of Acceptably tracked
     // Radius
@@ -161,6 +164,11 @@ struct findableStudy {
 
     // Found with prongs with the TPC (typical analysis setting)
     histos.add("h2dPtVsCentrality_Found", "h2dPtVsCentrality_Found", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_Found_ITSOnly", "h3dPtVsCentrality_Found_ITSOnly", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_Found_TPCOnly", "h3dPtVsCentrality_Found_TPCOnly", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_Found_ITSTPC", "h3dPtVsCentrality_Found_ITSTPC", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_Found_TPCTOF", "h3dPtVsCentrality_Found_TPCTOF", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_Found_TPCTRD", "h3dPtVsCentrality_Found_TPCTRD", kTH2D, {axisCentrality, axisPt});
 
     // Found in loop (may have duplicates, meant as cross-check too)
     histos.add("h2dPtVsCentrality_FoundInLoop", "h2dPtVsCentrality_FoundInLoop", kTH2D, {axisCentrality, axisPt});
@@ -286,10 +294,21 @@ struct findableStudy {
     bool hasBeenAcceptablyTracked_ITSTPC = false;
     bool hasBeenAcceptablyTracked_TPCTOF = false;
     bool hasBeenAcceptablyTracked_TPCTRD = false; 
-    bool isCollinear = false;
+    bool hasBeenFound_ITSOnly = false;
+    bool hasBeenFound_TPCOnly = false;
+    bool hasBeenFound_ITSTPC = false;
+    bool hasBeenFound_TPCTOF = false;
+    bool hasBeenFound_TPCTRD = false;
     int nCandidatesWithTPC = 0;
+    float DCADauITSonly =-100;
+    float DCADauTPConly =-100;
+    float DCADauITSTPC = -100;
+    float DCADauTPCTOF = -100;
+    float DCADauTPCTRD = -100;
 
     for (auto& recv0 : recv0s) {
+
+      histos.fill(HIST("hv0Type"), recv0.v0Type());
 
       if (recv0.v0Type() == 0) // skip v0 for cascades analysis
         continue; 
@@ -316,9 +335,6 @@ struct findableStudy {
       bool pTrack_isITSTPC = false, nTrack_isITSTPC = false;
       bool pTrack_isTPCTRD = false, nTrack_isTPCTRD = false;
       bool pTrack_isTPCTOF = false, nTrack_isTPCTOF = false;
-
-      if (recv0.v0Type() & (1 << 2))
-        isCollinear = true;
       
       // Detailed analysis level
       bool topoV0RadiusOK = false, topoV0RadiusMaxOK = false, topoV0CosPAOK = false, topoDcaPosToPVOK = false, topoDcaNegToPVOK = false, topoDcaV0DauOK = false;
@@ -371,18 +387,38 @@ struct findableStudy {
 
         if (pTrack_isITSonly && nTrack_isITSonly){
           hasBeenAcceptablyTracked_ITSOnly = true;
+          DCADauITSonly = recv0.dcaV0daughters();
+          if (recv0.isFound()){
+            hasBeenFound_ITSOnly = true;
+          }
         }
         if (pTrack_isTPConly && nTrack_isTPConly){
           hasBeenAcceptablyTracked_TPCOnly = true;
+          DCADauTPConly = recv0.dcaV0daughters();
+          if (recv0.isFound()){
+            hasBeenFound_TPCOnly = true;
+          }
         }
         if (pTrack_isITSTPC && nTrack_isITSTPC){
           hasBeenAcceptablyTracked_ITSTPC = true;
+          DCADauITSTPC = recv0.dcaV0daughters();
+          if (recv0.isFound()){
+            hasBeenFound_ITSTPC = true;
+          }
         }
         if (pTrack_isTPCTOF && nTrack_isTPCTOF){
           hasBeenAcceptablyTracked_TPCTOF = true;
+          DCADauTPCTOF = recv0.dcaV0daughters();
+          if (recv0.isFound()){
+            hasBeenFound_TPCTOF = true;
+          }
         }
         if (pTrack_isTPCTRD && nTrack_isTPCTRD){
           hasBeenAcceptablyTracked_TPCTRD = true;
+          DCADauTPCTRD = recv0.dcaV0daughters();
+          if (recv0.isFound()){
+            hasBeenFound_TPCTRD = true;
+          }
         }
         
         // cross-check correctness of new getter
@@ -533,24 +569,44 @@ struct findableStudy {
     }
     
     if (hasBeenAcceptablyTracked_ITSOnly){
-      histos.fill(HIST("h3dPtVsCentrality_AcceptTracked_ITSOnly"), centrality, ptmc, isCollinear);
+      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_ITSOnly"), centrality, ptmc);
       histos.fill(HIST("h3dPtVsCentralityRadius_ITSOnly"), centrality, ptmc, V0MCRadius); 
+      histos.fill(HIST("h3dPtVsCentralityDCADau_ITSOnly"), centrality, ptmc, DCADauITSonly); 
     }
     if (hasBeenAcceptablyTracked_TPCOnly){
-      histos.fill(HIST("h3dPtVsCentrality_AcceptTracked_TPCOnly"), centrality, ptmc, isCollinear);
+      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_TPCOnly"), centrality, ptmc);
       histos.fill(HIST("h3dPtVsCentralityRadius_TPCOnly"), centrality, ptmc, V0MCRadius);
+      histos.fill(HIST("h3dPtVsCentralityDCADau_TPCOnly"), centrality, ptmc, DCADauTPConly); 
     }
     if (hasBeenAcceptablyTracked_ITSTPC){
-      histos.fill(HIST("h3dPtVsCentrality_AcceptTracked_ITSTPC"), centrality, ptmc, isCollinear);
+      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_ITSTPC"), centrality, ptmc);
       histos.fill(HIST("h3dPtVsCentralityRadius_ITSTPC"), centrality, ptmc, V0MCRadius);
+      histos.fill(HIST("h3dPtVsCentralityDCADau_ITSTPC"), centrality, ptmc, DCADauITSTPC); 
     }
     if (hasBeenAcceptablyTracked_TPCTOF){
-      histos.fill(HIST("h3dPtVsCentrality_AcceptTracked_TPCTOF"), centrality, ptmc, isCollinear);
+      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_TPCTOF"), centrality, ptmc);
       histos.fill(HIST("h3dPtVsCentralityRadius_TPCTOF"), centrality, ptmc, V0MCRadius);
+      histos.fill(HIST("h3dPtVsCentralityDCADau_TPCTOF"), centrality, ptmc, DCADauTPCTOF); 
     }
     if (hasBeenAcceptablyTracked_TPCTRD){
-      histos.fill(HIST("h3dPtVsCentrality_AcceptTracked_TPCTRD"), centrality, ptmc, isCollinear);  
+      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_TPCTRD"), centrality, ptmc);  
       histos.fill(HIST("h3dPtVsCentralityRadius_TPCTRD"), centrality, ptmc, V0MCRadius); 
+      histos.fill(HIST("h3dPtVsCentralityDCADau_TPCTRD"), centrality, ptmc, DCADauTPCTRD); 
+    }
+    if (hasBeenFound_ITSOnly){
+      histos.fill(HIST("h2dPtVsCentrality_Found_ITSOnly"), centrality, ptmc);
+    }
+    if (hasBeenFound_TPCOnly){
+      histos.fill(HIST("h2dPtVsCentrality_Found_TPCOnly"), centrality, ptmc);
+    }
+    if (hasBeenFound_ITSTPC){
+      histos.fill(HIST("h2dPtVsCentrality_Found_ITSTPC"), centrality, ptmc);
+    }
+    if (hasBeenFound_TPCTOF){
+      histos.fill(HIST("h2dPtVsCentrality_Found_TPCTOF"), centrality, ptmc);
+    }
+    if (hasBeenFound_TPCTRD){
+      histos.fill(HIST("h2dPtVsCentrality_Found_TPCTRD"), centrality, ptmc);
     }
   }
 
