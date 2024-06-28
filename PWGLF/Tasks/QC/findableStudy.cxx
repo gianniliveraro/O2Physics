@@ -416,16 +416,16 @@ struct findableStudy {
           hasBeenAcceptablyTracked = true;
 
         // Getting tracking properties
-        pTrack_isITSonly = pTrack.hasITS() && !pTrack.hasTPC();
-        nTrack_isITSonly = nTrack.hasITS() && !nTrack.hasTPC();
-        pTrack_isTPConly = !pTrack.hasITS() && pTrack.hasTPC();
-        nTrack_isTPConly = !nTrack.hasITS() && nTrack.hasTPC();
-        pTrack_isITSTPC = pTrack.hasITS() && pTrack.hasTPC();      
-        nTrack_isITSTPC = nTrack.hasITS() && nTrack.hasTPC();
-        pTrack_isTPCTRD = pTrack.hasTPC() && pTrack.hasTRD();      
-        nTrack_isTPCTRD = nTrack.hasTPC() && nTrack.hasTRD();
-        pTrack_isTPCTOF = pTrack.hasTPC() && pTrack.hasTOF();      
-        nTrack_isTPCTOF = nTrack.hasTPC() && nTrack.hasTOF();
+        pTrack_isITSonly = pTrack.hasITS() && !pTrack.hasTPC() && !pTrack.hasTOF() && !pTrack.hasTRD();
+        nTrack_isITSonly = nTrack.hasITS() && !nTrack.hasTPC() && !nTrack.hasTOF() && !nTrack.hasTRD();
+        pTrack_isTPConly = !pTrack.hasITS() && pTrack.hasTPC() && !pTrack.hasTOF() && !pTrack.hasTRD();
+        nTrack_isTPConly = !nTrack.hasITS() && nTrack.hasTPC() && !nTrack.hasTOF() && !nTrack.hasTRD();
+        pTrack_isITSTPC = pTrack.hasITS() && pTrack.hasTPC() && !pTrack.hasTOF() && !pTrack.hasTRD();      
+        nTrack_isITSTPC = nTrack.hasITS() && nTrack.hasTPC() && !nTrack.hasTOF() && !nTrack.hasTRD();
+        pTrack_isTPCTRD = !pTrack.hasITS() && pTrack.hasTPC() && pTrack.hasTRD() && !pTrack.hasTOF();      
+        nTrack_isTPCTRD = !nTrack.hasITS() && nTrack.hasTPC() && nTrack.hasTRD() && !nTrack.hasTOF();
+        pTrack_isTPCTOF = !pTrack.hasITS() && pTrack.hasTPC() && pTrack.hasTOF() && !pTrack.hasTRD();      
+        nTrack_isTPCTOF = !nTrack.hasITS() && nTrack.hasTPC() && nTrack.hasTOF() && !nTrack.hasTRD();
 
         if (pTrack_isITSonly && nTrack_isITSonly){
           hasBeenAcceptablyTracked_ITSOnly = true;
