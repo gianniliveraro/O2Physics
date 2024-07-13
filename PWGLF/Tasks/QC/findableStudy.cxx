@@ -76,6 +76,7 @@ struct findableStudy {
 
   // master PDG code selection
   Configurable<int> pdgCode{"pdgCode", 310, "PDG code to select"};
+  Configurable<int> pdgCodeMother{"pdgCodeMother", -1, "PDG code mother to select"};
   Configurable<bool> skipITSonly{"skipITSonly", true, "skip reco V0s if an ITS-only (no TPC) prong present"};
   Configurable<bool> selStandardV0{"selStandardV0", true, "skip anything other than a standard V0 (V0Type==1)"};
 
@@ -126,7 +127,23 @@ struct findableStudy {
     // Duplicate counting
     histos.add("hNRecoV0s", "hNRecoV0s", kTH1D, {{50, -0.5, 49.5f}});
     histos.add("hNRecoV0sWithTPC", "hNRecoV0sWithTPC", kTH1D, {{50, -0.5, 49.5f}});
+
+    histos.add("h3dPtVsCentralityNRecoV0s_Findable",  "h3dPtVsCentralityNRecoV0s_Findable", kTH3D, {axisCentrality, axisPt, {50, -0.5, 49.5f}});
+    histos.add("h3dPtVsCentralityNRecoV0s_AcceptablyTracked_TPCOther",  "h3dPtVsCentralityNRecoV0s_AcceptablyTracked_TPCOther", kTH3D, {axisCentrality, axisPt, {50, -0.5, 49.5f}});
+    histos.add("h3dPtVsCentralityNRecoV0s_AcceptablyTracked_anyTPCOnly", "h3dPtVsCentralityNRecoV0s_AcceptablyTracked_anyTPCOnly", kTH3D, {axisCentrality, axisPt, {50, -0.5, 49.5f}});
+    histos.add("h3dPtVsCentralityNRecoV0s_AcceptablyTracked_TPCOnly", "h3dPtVsCentralityNRecoV0s_AcceptablyTracked_TPCOnly", kTH3D, {axisCentrality, axisPt, {50, -0.5, 49.5f}});
+    histos.add("h3dPtVsCentralityNRecoV0s_Found_TPCOther", "h3dPtVsCentralityNRecoV0s_Found_TPCOther", kTH3D, {axisCentrality, axisPt, {50, -0.5, 49.5f}});
+    histos.add("h3dPtVsCentralityNRecoV0s_Found_anyTPCOnly", "h3dPtVsCentralityNRecoV0s_Found_anyTPCOnly", kTH3D, {axisCentrality, axisPt, {50, -0.5, 49.5f}});
+    histos.add("h3dPtVsCentralityNRecoV0s_Found_TPCOnly", "h3dPtVsCentralityNRecoV0s_Found_TPCOnly", kTH3D, {axisCentrality, axisPt, {50, -0.5, 49.5f}});
+
+    // With wrong collision
     histos.add("hNRecoV0sWrongColl", "hNRecoV0sWrongColl", kTH1D, {{50, -0.5, 49.5f}});
+    histos.add("h3dPtVsCentralityNRecoV0sWrongColl_AcceptablyTracked_TPCOther",  "h3dPtVsCentralityNRecoV0sWrongColl_AcceptablyTracked_TPCOther", kTH3D, {axisCentrality, axisPt, {50, -0.5, 49.5f}});
+    histos.add("h3dPtVsCentralityNRecoV0sWrongColl_AcceptablyTracked_anyTPCOnly", "h3dPtVsCentralityNRecoV0sWrongColl_AcceptablyTracked_anyTPCOnly", kTH3D, {axisCentrality, axisPt, {50, -0.5, 49.5f}});
+    histos.add("h3dPtVsCentralityNRecoV0sWrongColl_AcceptablyTracked_TPCOnly", "h3dPtVsCentralityNRecoV0sWrongColl_AcceptablyTracked_TPCOnly", kTH3D, {axisCentrality, axisPt, {50, -0.5, 49.5f}});
+    histos.add("h3dPtVsCentralityNRecoV0sWrongColl_Found_TPCOther", "h3dPtVsCentralityNRecoV0sWrongColl_Found_TPCOther", kTH3D, {axisCentrality, axisPt, {50, -0.5, 49.5f}});
+    histos.add("h3dPtVsCentralityNRecoV0sWrongColl_Found_anyTPCOnly", "h3dPtVsCentralityNRecoV0sWrongColl_Found_anyTPCOnly", kTH3D, {axisCentrality, axisPt, {50, -0.5, 49.5f}});
+    histos.add("h3dPtVsCentralityNRecoV0sWrongColl_Found_TPCOnly", "h3dPtVsCentralityNRecoV0sWrongColl_Found_TPCOnly", kTH3D, {axisCentrality, axisPt, {50, -0.5, 49.5f}});
 
     // For broad correctness check
     histos.add("hFoundVsTracksOK", "hFoundVsTracksOK", kTH2D, {{2, -0.5, 1.5f}, {2, -0.5, 1.5f}});
@@ -139,8 +156,7 @@ struct findableStudy {
     histos.add("h2dPtVsCentrality_AcceptTracked_ITSOnly", "h3dPtVsCentrality_AcceptTracked_ITSOnly", kTH2D, {axisCentrality, axisPt});
     histos.add("h2dPtVsCentrality_AcceptTracked_TPCOnly", "h3dPtVsCentrality_AcceptTracked_TPCOnly", kTH2D, {axisCentrality, axisPt});
     histos.add("h2dPtVsCentrality_AcceptTracked_ITSTPC", "h3dPtVsCentrality_AcceptTracked_ITSTPC", kTH2D, {axisCentrality, axisPt});
-    histos.add("h2dPtVsCentrality_AcceptTracked_TPCTOF", "h3dPtVsCentrality_AcceptTracked_TPCTOF", kTH2D, {axisCentrality, axisPt});
-    histos.add("h2dPtVsCentrality_AcceptTracked_TPCTRD", "h3dPtVsCentrality_AcceptTracked_TPCTRD", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_AcceptTracked_ITSTPCOuter", "h3dPtVsCentrality_AcceptTracked_ITSTPCOuter", kTH2D, {axisCentrality, axisPt});
 
     // V0Type check
     histos.add("hv0Type", "hv0Type", kTH1D, {{6, -0.5, 5.5f}});
@@ -151,52 +167,45 @@ struct findableStudy {
     histos.add("h3dPtVsCentralityRadius_AcceptTracked_ITSOnly", "h3dPtVsCentralityRadius_AcceptTracked_ITSOnly", kTH3F, {axisCentrality, axisPt, axisV0Radius});
     histos.add("h3dPtVsCentralityRadius_AcceptTracked_TPCOnly", "h3dPtVsCentralityRadius_AcceptTracked_TPCOnly", kTH3F, {axisCentrality, axisPt, axisV0Radius});
     histos.add("h3dPtVsCentralityRadius_AcceptTracked_ITSTPC", "h3dPtVsCentralityRadius_AcceptTracked_ITSTPC", kTH3F, {axisCentrality, axisPt, axisV0Radius});
-    histos.add("h3dPtVsCentralityRadius_AcceptTracked_TPCTOF", "h3dPtVsCentralityRadius_AcceptTracked_TPCTOF", kTH3F, {axisCentrality, axisPt, axisV0Radius});
-    histos.add("h3dPtVsCentralityRadius_AcceptTracked_TPCTRD", "h3dPtVsCentralityRadius_AcceptTracked_TPCTRD", kTH3F, {axisCentrality, axisPt, axisV0Radius});
-
+    histos.add("h3dPtVsCentralityRadius_AcceptTracked_ITSTPCOuter", "h3dPtVsCentralityRadius_AcceptTracked_ITSTPCOuter", kTH3F, {axisCentrality, axisPt, axisV0Radius});
+    
     histos.add("h3dPtVsCentralityRadius_Found_ITSOnly", "h3dPtVsCentralityRadius_Found_ITSOnly", kTH3F, {axisCentrality, axisPt, axisV0Radius});
     histos.add("h3dPtVsCentralityRadius_Found_TPCOnly", "h3dPtVsCentralityRadius_Found_TPCOnly", kTH3F, {axisCentrality, axisPt, axisV0Radius});
     histos.add("h3dPtVsCentralityRadius_Found_ITSTPC", "h3dPtVsCentralityRadius_Found_ITSTPC", kTH3F, {axisCentrality, axisPt, axisV0Radius});
-    histos.add("h3dPtVsCentralityRadius_Found_TPCTOF", "h3dPtVsCentralityRadius_Found_TPCTOF", kTH3F, {axisCentrality, axisPt, axisV0Radius});
-    histos.add("h3dPtVsCentralityRadius_Found_TPCTRD", "h3dPtVsCentralityRadius_Found_TPCTRD", kTH3F, {axisCentrality, axisPt, axisV0Radius});
-
+    histos.add("h3dPtVsCentralityRadius_Found_ITSTPCOuter", "h3dPtVsCentralityRadius_Found_ITSTPCOuter", kTH3F, {axisCentrality, axisPt, axisV0Radius});
+    
     // Radius resolution
     histos.add("hRadiusResolution_AcceptTracked_ITSOnly","hRadiusResolution_AcceptTracked_ITSOnly" , kTH1F, {axisRadiusResolution});
     histos.add("hRadiusResolution_AcceptTracked_TPCOnly","hRadiusResolution_AcceptTracked_TPCOnly" , kTH1F, {axisRadiusResolution});
     histos.add("hRadiusResolution_AcceptTracked_ITSTPC", "hRadiusResolution_AcceptTracked_ITSTPC", kTH1F, {axisRadiusResolution});
-    histos.add("hRadiusResolution_AcceptTracked_TPCTOF", "hRadiusResolution_AcceptTracked_TPCTOF", kTH1F, {axisRadiusResolution});
-    histos.add("hRadiusResolution_AcceptTracked_TPCTRD", "hRadiusResolution_AcceptTracked_TPCTRD", kTH1F, {axisRadiusResolution});
-
+    histos.add("hRadiusResolution_AcceptTracked_ITSTPCOuter", "hRadiusResolution_AcceptTracked_ITSTPCOuter", kTH1F, {axisRadiusResolution});
+    
     histos.add("hRadiusResolution_Found_ITSOnly","hRadiusResolution_Found_ITSOnly" , kTH1F, {axisRadiusResolution});
     histos.add("hRadiusResolution_Found_TPCOnly","hRadiusResolution_Found_TPCOnly" , kTH1F, {axisRadiusResolution});
     histos.add("hRadiusResolution_Found_ITSTPC", "hRadiusResolution_Found_ITSTPC", kTH1F, {axisRadiusResolution});
-    histos.add("hRadiusResolution_Found_TPCTOF", "hRadiusResolution_Found_TPCTOF", kTH1F, {axisRadiusResolution});
-    histos.add("hRadiusResolution_Found_TPCTRD", "hRadiusResolution_Found_TPCTRD", kTH1F, {axisRadiusResolution});
-
+    histos.add("hRadiusResolution_Found_ITSTPCOuter", "hRadiusResolution_Found_ITSTPCOuter", kTH1F, {axisRadiusResolution});
+    
     // DCADau
     histos.add("h3dPtVsCentralityDCADau_AcceptTracked_ITSOnly", "h3dPtVsCentralityDCADau_AcceptTracked_ITSOnly", kTH3F, {axisCentrality, axisPt, axisDCAdau});
     histos.add("h3dPtVsCentralityDCADau_AcceptTracked_TPCOnly", "h3dPtVsCentralityDCADau_AcceptTracked_TPCOnly", kTH3F, {axisCentrality, axisPt, axisDCAdau});
     histos.add("h3dPtVsCentralityDCADau_AcceptTracked_ITSTPC", "h3dPtVsCentralityDCADau_AcceptTracked_ITSTPC", kTH3F, {axisCentrality, axisPt, axisDCAdau});
-    histos.add("h3dPtVsCentralityDCADau_AcceptTracked_TPCTOF", "h3dPtVsCentralityDCADau_AcceptTracked_TPCTOF", kTH3F, {axisCentrality, axisPt, axisDCAdau});
-    histos.add("h3dPtVsCentralityDCADau_AcceptTracked_TPCTRD", "h3dPtVsCentralityDCADau_AcceptTracked_TPCTRD", kTH3F, {axisCentrality, axisPt, axisDCAdau});
-
+    histos.add("h3dPtVsCentralityDCADau_AcceptTracked_ITSTPCOuter", "h3dPtVsCentralityDCADau_AcceptTracked_ITSTPCOuter", kTH3F, {axisCentrality, axisPt, axisDCAdau});
+    
     histos.add("h3dPtVsCentralityDCADau_Found_ITSOnly", "h3dPtVsCentralityDCADau_Found_ITSOnly", kTH3F, {axisCentrality, axisPt, axisDCAdau});
     histos.add("h3dPtVsCentralityDCADau_Found_TPCOnly", "h3dPtVsCentralityDCADau_Found_TPCOnly", kTH3F, {axisCentrality, axisPt, axisDCAdau});
     histos.add("h3dPtVsCentralityDCADau_Found_ITSTPC", "h3dPtVsCentralityDCADau_Found_ITSTPC", kTH3F, {axisCentrality, axisPt, axisDCAdau});
-    histos.add("h3dPtVsCentralityDCADau_Found_TPCTOF", "h3dPtVsCentralityDCADau_Found_TPCTOF", kTH3F, {axisCentrality, axisPt, axisDCAdau});
-    histos.add("h3dPtVsCentralityDCADau_Found_TPCTRD", "h3dPtVsCentralityDCADau_Found_TPCTRD", kTH3F, {axisCentrality, axisPt, axisDCAdau});
-
+    histos.add("h3dPtVsCentralityDCADau_Found_ITSTPCOuter", "h3dPtVsCentralityDCADau_Found_ITSTPCOuter", kTH3F, {axisCentrality, axisPt, axisDCAdau});
+    
     // Found in any capacity, including ITSonly
     histos.add("h2dPtVsCentrality_FoundAny", "h2dPtVsCentrality_FoundAny", kTH2D, {axisCentrality, axisPt});
 
     // Found with prongs with the TPC (typical analysis setting)
     histos.add("h2dPtVsCentrality_Found", "h2dPtVsCentrality_Found", kTH2D, {axisCentrality, axisPt});
-    histos.add("h2dPtVsCentrality_Found_ITSOnly", "h3dPtVsCentrality_Found_ITSOnly", kTH2D, {axisCentrality, axisPt});
-    histos.add("h2dPtVsCentrality_Found_TPCOnly", "h3dPtVsCentrality_Found_TPCOnly", kTH2D, {axisCentrality, axisPt});
-    histos.add("h2dPtVsCentrality_Found_ITSTPC", "h3dPtVsCentrality_Found_ITSTPC", kTH2D, {axisCentrality, axisPt});
-    histos.add("h2dPtVsCentrality_Found_TPCTOF", "h3dPtVsCentrality_Found_TPCTOF", kTH2D, {axisCentrality, axisPt});
-    histos.add("h2dPtVsCentrality_Found_TPCTRD", "h3dPtVsCentrality_Found_TPCTRD", kTH2D, {axisCentrality, axisPt});
-
+    histos.add("h2dPtVsCentrality_Found_ITSOnly", "h2dPtVsCentrality_Found_ITSOnly", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_Found_TPCOnly", "h2dPtVsCentrality_Found_TPCOnly", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_Found_ITSTPC", "h2dPtVsCentrality_Found_ITSTPC", kTH2D, {axisCentrality, axisPt});
+    histos.add("h2dPtVsCentrality_Found_ITSTPCOuter", "h2dPtVsCentrality_Found_ITSTPCOuter", kTH2D, {axisCentrality, axisPt});
+    
     // Found in loop (may have duplicates, meant as cross-check too)
     histos.add("h2dPtVsCentrality_FoundInLoop", "h2dPtVsCentrality_FoundInLoop", kTH2D, {axisCentrality, axisPt});
 
@@ -291,6 +300,10 @@ struct findableStudy {
       pdgCodeNegative = +11;
     }
 
+    if (pdgCodeMother!=-1 && v0.pdgCodeMother()!=pdgCodeMother){
+      return;
+    }
+    
     if (v0.pdgCode() != pdgCode || v0.pdgCodePositive() != pdgCodePositive || v0.pdgCodeNegative() != pdgCodeNegative)
       return;
     if (!v0.isPhysicalPrimary())
@@ -319,34 +332,32 @@ struct findableStudy {
     bool hasBeenAcceptablyTracked_ITSOnly = false;
     bool hasBeenAcceptablyTracked_TPCOnly = false;
     bool hasBeenAcceptablyTracked_ITSTPC = false;
-    bool hasBeenAcceptablyTracked_TPCTOF = false;
-    bool hasBeenAcceptablyTracked_TPCTRD = false; 
+    bool hasBeenAcceptablyTracked_ITSTPCOuter = false;
     bool hasBeenFound_ITSOnly = false;
     bool hasBeenFound_TPCOnly = false;
     bool hasBeenFound_ITSTPC = false;
-    bool hasBeenFound_TPCTOF = false;
-    bool hasBeenFound_TPCTRD = false;
+    bool hasBeenFound_ITSTPCOuter = false;
+    bool hasBeenAcceptablyTracked_TPCOthers = false;
+    bool hasTPCOthersFound = false;
+    bool hasoneTPCOnly = false;
+    bool hasoneTPCOnlyFound = false;
     int nCandidatesWithTPC = 0;
     float DCADau_Acctrk_ITSonly =-100;
     float DCADau_Acctrk_TPConly =-100;
     float DCADau_Acctrk_ITSTPC = -100;
-    float DCADau_Acctrk_TPCTOF = -100;
-    float DCADau_Acctrk_TPCTRD = -100;
+    float DCADau_Acctrk_ITSTPCOuter = -100;
     float DCADau_Found_ITSonly =-100;
     float DCADau_Found_TPConly =-100;
     float DCADau_Found_ITSTPC = -100;
-    float DCADau_Found_TPCTOF = -100;
-    float DCADau_Found_TPCTRD = -100;
+    float DCADau_Found_ITSTPCOuter = -100;
     float RecoRadius_Acctrk_ITSonly =-100;
     float RecoRadius_Acctrk_TPConly =-100;
     float RecoRadius_Acctrk_ITSTPC = -100;
-    float RecoRadius_Acctrk_TPCTOF = -100;
-    float RecoRadius_Acctrk_TPCTRD = -100;
+    float RecoRadius_Acctrk_ITSTPCOuter = -100;
     float RecoRadius_Found_ITSonly =-100;
     float RecoRadius_Found_TPConly =-100;
     float RecoRadius_Found_ITSTPC = -100;
-    float RecoRadius_Found_TPCTOF = -100;
-    float RecoRadius_Found_TPCTRD = -100;
+    float RecoRadius_Found_ITSTPCOuter = -100;
 
     for (auto& recv0 : recv0s) {
 
@@ -375,8 +386,7 @@ struct findableStudy {
       bool pTrack_isITSonly = false, nTrack_isITSonly = false; 
       bool pTrack_isTPConly = false, nTrack_isTPConly = false;
       bool pTrack_isITSTPC = false, nTrack_isITSTPC = false;
-      bool pTrack_isTPCTRD = false, nTrack_isTPCTRD = false;
-      bool pTrack_isTPCTOF = false, nTrack_isTPCTOF = false;
+      bool pTrack_isITSTPCOuter = false, nTrack_isITSTPCOuter = false;
       
       // Detailed analysis level
       bool topoV0RadiusOK = false, topoV0RadiusMaxOK = false, topoV0CosPAOK = false, topoDcaPosToPVOK = false, topoDcaNegToPVOK = false, topoDcaV0DauOK = false;
@@ -422,10 +432,8 @@ struct findableStudy {
         nTrack_isTPConly = !nTrack.hasITS() && nTrack.hasTPC() && !nTrack.hasTOF() && !nTrack.hasTRD();
         pTrack_isITSTPC = pTrack.hasITS() && pTrack.hasTPC() && !pTrack.hasTOF() && !pTrack.hasTRD();      
         nTrack_isITSTPC = nTrack.hasITS() && nTrack.hasTPC() && !nTrack.hasTOF() && !nTrack.hasTRD();
-        pTrack_isTPCTRD = !pTrack.hasITS() && pTrack.hasTPC() && pTrack.hasTRD() && !pTrack.hasTOF();      
-        nTrack_isTPCTRD = !nTrack.hasITS() && nTrack.hasTPC() && nTrack.hasTRD() && !nTrack.hasTOF();
-        pTrack_isTPCTOF = !pTrack.hasITS() && pTrack.hasTPC() && pTrack.hasTOF() && !pTrack.hasTRD();      
-        nTrack_isTPCTOF = !nTrack.hasITS() && nTrack.hasTPC() && nTrack.hasTOF() && !nTrack.hasTRD();
+        pTrack_isITSTPCOuter = pTrack.hasITS() && pTrack.hasTPC() && (pTrack.hasTRD() || pTrack.hasTOF());      
+        nTrack_isITSTPCOuter = nTrack.hasITS() && nTrack.hasTPC() && (nTrack.hasTRD() || nTrack.hasTOF());
 
         if (pTrack_isITSonly && nTrack_isITSonly){
           hasBeenAcceptablyTracked_ITSOnly = true;
@@ -438,7 +446,7 @@ struct findableStudy {
             DCADau_Found_ITSonly = recv0.dcaV0daughters();
           }
         }
-        if (pTrack_isTPConly && nTrack_isTPConly){
+        if (pTrack_isTPConly && nTrack_isTPConly){ // TPConly
           hasBeenAcceptablyTracked_TPCOnly = true;
           DCADau_Acctrk_TPConly = recv0.dcaV0daughters();
           RecoRadius_Acctrk_TPConly = recv0.v0radius();
@@ -458,25 +466,29 @@ struct findableStudy {
             DCADau_Found_ITSTPC = recv0.dcaV0daughters();
           }
         }
-        if (pTrack_isTPCTOF && nTrack_isTPCTOF){
-          hasBeenAcceptablyTracked_TPCTOF = true;
-          DCADau_Acctrk_TPCTOF = recv0.dcaV0daughters();
-          RecoRadius_Acctrk_TPCTOF = recv0.v0radius();
+        if (pTrack_isITSTPCOuter && nTrack_isITSTPCOuter){
+          hasBeenAcceptablyTracked_ITSTPCOuter = true;
+          DCADau_Acctrk_ITSTPCOuter = recv0.dcaV0daughters();
+          RecoRadius_Acctrk_ITSTPCOuter = recv0.v0radius();
           if (recv0.isFound()){
-            hasBeenFound_TPCTOF = true;
-            RecoRadius_Found_TPCTOF = recv0.v0radius();
-            DCADau_Found_TPCTOF = recv0.dcaV0daughters();
+            hasBeenFound_ITSTPCOuter = true;
+            RecoRadius_Found_ITSTPCOuter = recv0.v0radius();
+            DCADau_Found_ITSTPCOuter = recv0.dcaV0daughters();
           }
         }
-        if (pTrack_isTPCTRD && nTrack_isTPCTRD){
-          hasBeenAcceptablyTracked_TPCTRD = true;
-          DCADau_Acctrk_TPCTRD = recv0.dcaV0daughters();
-          RecoRadius_Acctrk_TPCTRD = recv0.v0radius();
+
+        // TPC specific:
+        if ((pTrack_isITSTPCOuter || pTrack_isITSTPC) && (nTrack_isITSTPCOuter || nTrack_isITSTPC)){ // TPC+something
+          hasBeenAcceptablyTracked_TPCOthers = true;
           if (recv0.isFound()){
-            hasBeenFound_TPCTRD = true;
-            RecoRadius_Found_TPCTRD = recv0.v0radius();
-            DCADau_Found_TPCTRD = recv0.dcaV0daughters();
+            hasTPCOthersFound = true;
           }
+        }
+        if ((pTrack_isTPConly && !nTrack_isTPConly) || (!pTrack_isTPConly && nTrack_isTPConly)){ // just one TPConly track
+          hasoneTPCOnly = true;
+          if (recv0.isFound()){
+            hasoneTPCOnlyFound = true;
+            }
         }
         
         // cross-check correctness of new getter
@@ -614,6 +626,9 @@ struct findableStudy {
     // Major check 1: Findable versus found in some capacity
     histos.fill(HIST("h2dPtVsCentrality_Findable"), centrality, ptmc);
 
+    // N. of reconstructed 
+    histos.fill(HIST("h3dPtVsCentralityNRecoV0s_Findable"), centrality, ptmc, recv0s.size());
+
     // Findable radius
     histos.fill(HIST("h2dPtVsCentrality_Findable_Radius"), centrality, ptmc, V0MCRadius);
 
@@ -645,6 +660,24 @@ struct findableStudy {
       histos.fill(HIST("h3dPtVsCentralityRadius_AcceptTracked_TPCOnly"), centrality, ptmc, V0MCRadius);
       histos.fill(HIST("h3dPtVsCentralityDCADau_AcceptTracked_TPCOnly"), centrality, ptmc, DCADau_Acctrk_TPConly);
       histos.fill(HIST("hRadiusResolution_AcceptTracked_TPCOnly"), RadiusReso_TPCOnly);  
+      histos.fill(HIST("h3dPtVsCentralityNRecoV0s_AcceptablyTracked_TPCOnly"), centrality, ptmc, recv0s.size());
+
+      if (hasWrongCollision) {
+        histos.fill(HIST("h3dPtVsCentralityNRecoV0sWrongColl_AcceptablyTracked_TPCOnly"), centrality, ptmc, recv0s.size());
+      }
+      
+    }
+    if (hasBeenAcceptablyTracked_TPCOthers){
+      histos.fill(HIST("h3dPtVsCentralityNRecoV0s_AcceptablyTracked_TPCOther"), centrality, ptmc, recv0s.size());
+      if (hasWrongCollision) {
+        histos.fill(HIST("h3dPtVsCentralityNRecoV0sWrongColl_AcceptablyTracked_TPCOther"), centrality, ptmc, recv0s.size());
+      }
+    }
+    if (hasoneTPCOnly){
+      histos.fill(HIST("h3dPtVsCentralityNRecoV0s_AcceptablyTracked_anyTPCOnly"), centrality, ptmc, recv0s.size());
+      if (hasWrongCollision) {
+        histos.fill(HIST("h3dPtVsCentralityNRecoV0sWrongColl_AcceptablyTracked_anyTPCOnly"), centrality, ptmc, recv0s.size());
+      }
     }
     if (hasBeenAcceptablyTracked_ITSTPC){
       float RadiusReso_ITSTPC = TMath::Abs(V0MCRadius-RecoRadius_Acctrk_ITSTPC);
@@ -654,22 +687,15 @@ struct findableStudy {
       histos.fill(HIST("h3dPtVsCentralityDCADau_AcceptTracked_ITSTPC"), centrality, ptmc, DCADau_Acctrk_ITSTPC); 
       histos.fill(HIST("hRadiusResolution_AcceptTracked_ITSTPC"), RadiusReso_ITSTPC);
     }
-    if (hasBeenAcceptablyTracked_TPCTOF){
-      float RadiusReso_TPCTOF = TMath::Abs(V0MCRadius-RecoRadius_Acctrk_TPCTOF);
+    if (hasBeenAcceptablyTracked_ITSTPCOuter){
+      float RadiusReso_ITSTPCOuter = TMath::Abs(V0MCRadius-RecoRadius_Acctrk_ITSTPCOuter);
 
-      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_TPCTOF"), centrality, ptmc);
-      histos.fill(HIST("h3dPtVsCentralityRadius_AcceptTracked_TPCTOF"), centrality, ptmc, V0MCRadius);
-      histos.fill(HIST("h3dPtVsCentralityDCADau_AcceptTracked_TPCTOF"), centrality, ptmc, DCADau_Acctrk_TPCTOF); 
-      histos.fill(HIST("hRadiusResolution_AcceptTracked_TPCTOF"), RadiusReso_TPCTOF);
+      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_ITSTPCOuter"), centrality, ptmc);
+      histos.fill(HIST("h3dPtVsCentralityRadius_AcceptTracked_ITSTPCOuter"), centrality, ptmc, V0MCRadius);
+      histos.fill(HIST("h3dPtVsCentralityDCADau_AcceptTracked_ITSTPCOuter"), centrality, ptmc, DCADau_Acctrk_ITSTPCOuter); 
+      histos.fill(HIST("hRadiusResolution_AcceptTracked_ITSTPCOuter"), RadiusReso_ITSTPCOuter);
     }
-    if (hasBeenAcceptablyTracked_TPCTRD){
-      float RadiusReso_TPCTRD = TMath::Abs(V0MCRadius-RecoRadius_Acctrk_TPCTRD);
-
-      histos.fill(HIST("h2dPtVsCentrality_AcceptTracked_TPCTRD"), centrality, ptmc);  
-      histos.fill(HIST("h3dPtVsCentralityRadius_AcceptTracked_TPCTRD"), centrality, ptmc, V0MCRadius); 
-      histos.fill(HIST("h3dPtVsCentralityDCADau_AcceptTracked_TPCTRD"), centrality, ptmc, DCADau_Acctrk_TPCTRD); 
-      histos.fill(HIST("hRadiusResolution_AcceptTracked_TPCTRD"), RadiusReso_TPCTRD);
-    }
+    
     // Founds specific
     if (hasBeenFound_ITSOnly){
       float RadiusReso_ITSOnly = TMath::Abs(V0MCRadius-RecoRadius_Found_ITSonly);
@@ -686,6 +712,23 @@ struct findableStudy {
       histos.fill(HIST("hRadiusResolution_Found_TPCOnly"), RadiusReso_TPCOnly);
       histos.fill(HIST("h3dPtVsCentralityRadius_Found_TPCOnly"), centrality, ptmc, V0MCRadius); 
       histos.fill(HIST("h3dPtVsCentralityDCADau_Found_TPCOnly"), centrality, ptmc, DCADau_Found_TPConly); 
+      histos.fill(HIST("h3dPtVsCentralityNRecoV0s_Found_TPCOnly"), centrality, ptmc, recv0s.size());
+
+      if (hasWrongCollision) {
+        histos.fill(HIST("h3dPtVsCentralityNRecoV0sWrongColl_Found_TPCOnly"), centrality, ptmc, recv0s.size());
+      }
+    }
+    if (hasTPCOthersFound){
+      histos.fill(HIST("h3dPtVsCentralityNRecoV0s_Found_TPCOther"), centrality, ptmc, recv0s.size());
+      if (hasWrongCollision) {
+        histos.fill(HIST("h3dPtVsCentralityNRecoV0sWrongColl_Found_TPCOther"), centrality, ptmc, recv0s.size());
+      }
+    }
+    if (hasoneTPCOnlyFound){
+      histos.fill(HIST("h3dPtVsCentralityNRecoV0s_Found_anyTPCOnly"), centrality, ptmc, recv0s.size());
+      if (hasWrongCollision) {
+        histos.fill(HIST("h3dPtVsCentralityNRecoV0sWrongColl_Found_anyTPCOnly"), centrality, ptmc, recv0s.size());
+      }
     }
     if (hasBeenFound_ITSTPC){
       float RadiusReso_ITSTPC = TMath::Abs(V0MCRadius-RecoRadius_Found_ITSTPC);
@@ -695,21 +738,13 @@ struct findableStudy {
       histos.fill(HIST("h3dPtVsCentralityRadius_Found_ITSTPC"), centrality, ptmc, V0MCRadius); 
       histos.fill(HIST("h3dPtVsCentralityDCADau_Found_ITSTPC"), centrality, ptmc, DCADau_Found_ITSTPC); 
     }
-    if (hasBeenFound_TPCTOF){
-      float RadiusReso_TPCTOF = TMath::Abs(V0MCRadius-RecoRadius_Found_TPCTOF);
+    if (hasBeenFound_ITSTPCOuter){
+      float RadiusReso_ITSTPCOuter = TMath::Abs(V0MCRadius-RecoRadius_Found_ITSTPCOuter);
 
-      histos.fill(HIST("h2dPtVsCentrality_Found_TPCTOF"), centrality, ptmc);
-      histos.fill(HIST("hRadiusResolution_Found_TPCTOF"), RadiusReso_TPCTOF);
-      histos.fill(HIST("h3dPtVsCentralityRadius_Found_TPCTOF"), centrality, ptmc, V0MCRadius); 
-      histos.fill(HIST("h3dPtVsCentralityDCADau_Found_TPCTOF"), centrality, ptmc, DCADau_Found_TPCTOF); 
-    }
-    if (hasBeenFound_TPCTRD){
-      float RadiusReso_TPCTRD = TMath::Abs(V0MCRadius-RecoRadius_Found_TPCTRD);
-
-      histos.fill(HIST("h2dPtVsCentrality_Found_TPCTRD"), centrality, ptmc);
-      histos.fill(HIST("hRadiusResolution_Found_TPCTRD"), RadiusReso_TPCTRD);
-      histos.fill(HIST("h3dPtVsCentralityRadius_Found_TPCTRD"), centrality, ptmc, V0MCRadius); 
-      histos.fill(HIST("h3dPtVsCentralityDCADau_Found_TPCTRD"), centrality, ptmc, DCADau_Found_TPCTRD); 
+      histos.fill(HIST("h2dPtVsCentrality_Found_ITSTPCOuter"), centrality, ptmc);
+      histos.fill(HIST("hRadiusResolution_Found_ITSTPCOuter"), RadiusReso_ITSTPCOuter);
+      histos.fill(HIST("h3dPtVsCentralityRadius_Found_ITSTPCOuter"), centrality, ptmc, V0MCRadius); 
+      histos.fill(HIST("h3dPtVsCentralityDCADau_Found_ITSTPCOuter"), centrality, ptmc, DCADau_Found_ITSTPCOuter); 
     }
   }
 
