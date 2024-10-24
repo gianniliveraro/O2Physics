@@ -14,7 +14,7 @@
 #include "Framework/ASoAHelpers.h"
 #include "Common/Core/RecoDecay.h"
 #include "CommonConstants/PhysicsConstants.h"
-
+a
 #ifndef PWGLF_DATAMODEL_LFSTRANGENESSMLTABLES_H_
 #define PWGLF_DATAMODEL_LFSTRANGENESSMLTABLES_H_
 
@@ -45,6 +45,10 @@ DECLARE_SOA_COLUMN(LambdaMass, lambdaMass, float);
 DECLARE_SOA_COLUMN(AntiLambdaMass, antiLambdaMass, float);
 DECLARE_SOA_COLUMN(GammaMass, gammaMass, float);
 DECLARE_SOA_COLUMN(KZeroShortMass, kZeroShortMass, float);
+DECLARE_SOA_COLUMN(LambdaY, lambdaY, float);
+DECLARE_SOA_COLUMN(AntiLambdaY, antiLambdaY, float);
+DECLARE_SOA_COLUMN(GammaY, gammaY, float);
+DECLARE_SOA_COLUMN(KZeroShortY, kZeroShortY, float);
 DECLARE_SOA_COLUMN(PT, pT, float);
 DECLARE_SOA_COLUMN(Qt, qt, float);
 DECLARE_SOA_COLUMN(Alpha, alpha, float);
@@ -92,6 +96,10 @@ DECLARE_SOA_TABLE(V0MLCandidates, "AOD", "V0MLCANDIDATES",
                   v0mlcandidates::AntiLambdaMass,
                   v0mlcandidates::GammaMass,
                   v0mlcandidates::KZeroShortMass,
+                  v0mlcandidates::LambdaY,
+                  v0mlcandidates::AntiLambdaY,
+                  v0mlcandidates::GammaY,
+                  v0mlcandidates::KZeroShortY,
                   v0mlcandidates::PT,
                   v0mlcandidates::Qt,
                   v0mlcandidates::Alpha,

@@ -145,6 +145,10 @@ struct lambdakzeroMLSelectionTreeCreator {
     float AntiLambdaMass;
     float GammaMass;
     float KZeroShortMass;
+    float LambdaY;
+    float AntiLambdaY;
+    float GammaY;
+    float KZeroShortY;
     float pT;
     float qt;
     float alpha;
@@ -210,6 +214,10 @@ struct lambdakzeroMLSelectionTreeCreator {
     Candidate.AntiLambdaMass = cand.mAntiLambda();
     Candidate.GammaMass = cand.mGamma();
     Candidate.KZeroShortMass = cand.mK0Short();
+    Candidate.LambdaY = RecoDecay::y(std::array{cand.px(), cand.py(), cand.pz()}, o2::constants::physics::MassLambda0);
+    Candidate.AntiLambdaY = RecoDecay::y(std::array{cand.px(), cand.py(), cand.pz()}, o2::constants::physics::MassLambda0);
+    Candidate.GammaY = RecoDecay::y(std::array{cand.px(), cand.py(), cand.pz()}, o2::constants::physics::MassGamma);
+    Candidate.KZeroShortY = RecoDecay::y(std::array{cand.px(), cand.py(), cand.pz()}, o2::constants::physics::MassK0Short);
     Candidate.pT = cand.pt();
     Candidate.qt = cand.qtarm();
     Candidate.alpha = cand.alpha();
@@ -285,7 +293,8 @@ struct lambdakzeroMLSelectionTreeCreator {
                    Candidate.posTPCSigmaPi, Candidate.negTPCSigmaPi, Candidate.posTPCSigmaPr, Candidate.negTPCSigmaPr,
                    Candidate.posTPCSigmaEl, Candidate.negTPCSigmaEl, Candidate.TOFSigmaLaPr, Candidate.TOFSigmaLaPi,
                    Candidate.TOFSigmaALaPi, Candidate.TOFSigmaALaPr, Candidate.TOFSigmaK0PiPlus, Candidate.TOFSigmaK0PiMinus,
-                   Candidate.LambdaMass, Candidate.AntiLambdaMass, Candidate.GammaMass, Candidate.KZeroShortMass, Candidate.pT,
+                   Candidate.LambdaMass, Candidate.AntiLambdaMass, Candidate.GammaMass, Candidate.KZeroShortMass, 
+                   Candidate.LambdaY, Candidate.AntiLambdaY, Candidate.GammaY, Candidate.KZeroShortY, Candidate.pT,
                    Candidate.qt, Candidate.alpha, Candidate.posEta, Candidate.negEta, Candidate.v0Eta, Candidate.Z,
                    Candidate.v0radius, Candidate.PA, Candidate.dcapostopv, Candidate.dcanegtopv, Candidate.dcaV0daughters, Candidate.dcav0topv, Candidate.PsiPair,
                    Candidate.v0type, Candidate.centrality, Candidate.SelHypothesis, Candidate.isLambda, Candidate.isAntiLambda, Candidate.isGamma, Candidate.isKZeroShort, Candidate.PDGCodeMother);
