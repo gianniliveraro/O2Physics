@@ -263,6 +263,9 @@ struct sigmaanalysis {
       histos.add("MC/h2dPtVsOPAngle_TrueDaughters", "h2dPtVsOPAngle_TrueDaughters", kTH2D, {axisPt, {140, 0.0f, +7.0f}});
       histos.add("MC/h2dPtVsMassSigma_AfterOPAngleSel", "h2dPtVsMassSigma_AfterOPAngleSel", kTH2D, {axisPt, axisSigmaMass});
 
+      //// Pi0 rejection
+      histos.add("MC/h2dPtVsMassSigma_AfterPi0RejSel", "h2dPtVsMassSigma_AfterPi0RejSel", kTH2D, {axisPt, axisSigmaMass});
+
       // For efficiency/Purity studies
       // Before any selection
       histos.add("MC/hPtTrueLambda_BeforeSel", "hPtTrueLambda_BeforeSel", kTH1F, {axisPt}); // Signal only
@@ -291,6 +294,10 @@ struct sigmaanalysis {
       //// Opening Angle
       histos.add("MC/hPtTrueSigma_AngleSel", "hPtTrueSigma_AngleSel", kTH1F, {axisPt});
       histos.add("MC/hPtSigmaCand_AngleSel", "hPtSigmaCand_AngleSel", kTH1F, {axisPt});
+
+      //// Pi0 rejection
+      histos.add("MC/hPtTrueSigma_Pi0RejSel", "hPtTrueSigma_Pi0RejSel", kTH1F, {axisPt});
+      histos.add("MC/hPtSigmaCand_Pi0RejSel", "hPtSigmaCand_Pi0RejSel", kTH1F, {axisPt});
 
       //// TPC PID
       histos.add("MC/hPtTrueLambda_TPCPID", "hPtTrueLambda_TPCPID", kTH1F, {axisPt});
@@ -426,7 +433,7 @@ struct sigmaanalysis {
         return false;
       histos.fill(HIST("GeneralQA/hSigmaOPAngle"), cand.sigmaOPAngle());
       histos.fill(HIST("GeneralQA/hCandidateAnalysisSelection"), 24.);
-      if (cand.sigmaOPAngle() > SigmaOPAngle)
+      if (cand.sigmaOPAngle() > 2.0) // TODO: change this!
         return false;
       histos.fill(HIST("GeneralQA/hCandidateAnalysisSelection"), 25.);
     }
@@ -520,6 +527,14 @@ struct sigmaanalysis {
           histos.fill(HIST("MC/hPtTrueSigma_AngleSel"), sigma.sigmapT());
       }
 
+      // For pi0 rejection study
+      if (!sigma.isPhotonFromPi0()) {
+        histos.fill(HIST("MC/h2dPtVsMassSigma_AfterPi0RejSel"), sigma.sigmapT(), sigma.sigmaMass());
+        histos.fill(HIST("MC/hPtSigmaCand_Pi0RejSel"), sigma.sigmapT());
+        if (sigma.isSigma() || sigma.isAntiSigma())
+          histos.fill(HIST("MC/hPtTrueSigma_Pi0RejSel"), sigma.sigmapT());
+      }
+
       // For background studies:
       histos.fill(HIST("MC/h2dPtVsMassSigma_SignalBkg"), sigma.sigmapT(), sigma.sigmaMass());
       // Real Gamma x Real Lambda - but not from the same sigma0/antisigma0!
@@ -548,7 +563,8 @@ struct sigmaanalysis {
         histos.fill(HIST("GeneralQA/hPhotonMassSelected"), sigma.photonMass());
         if (sigma.isSigma()) {
           // PID selections
-          if ((TMath::Abs(sigma.lambdaPosPrTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.lambdaNegPiTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.lambdaPrTOFNSigma()) < LambdaMaxTOFNSigmas) && (TMath::Abs(sigma.lambdaPiTOFNSigma()) < LambdaMaxTOFNSigmas)) {
+          //if ((TMath::Abs(sigma.lambdaPosPrTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.lambdaNegPiTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.lambdaPrTOFNSigma()) < LambdaMaxTOFNSigmas) && (TMath::Abs(sigma.lambdaPiTOFNSigma()) < LambdaMaxTOFNSigmas)) {
+          if ((TMath::Abs(sigma.lambdaPosPrTPCNSigma()) < 1e+9) && (TMath::Abs(sigma.lambdaNegPiTPCNSigma()) < 1e+9) && (TMath::Abs(sigma.lambdaPrTOFNSigma()) < 1e+9) && (TMath::Abs(sigma.lambdaPiTOFNSigma()) < 1e+9)) {
             histos.fill(HIST("MC/h2dArmenterosAfterSel"), sigma.photonAlpha(), sigma.photonQt());
             histos.fill(HIST("MC/h2dArmenterosAfterSel"), sigma.lambdaAlpha(), sigma.lambdaQt());
             histos.fill(HIST("GeneralQA/hLambdaMassSelected"), sigma.lambdaMass());
@@ -558,7 +574,8 @@ struct sigmaanalysis {
           }
         } else {
           // PID selections
-          if ((TMath::Abs(sigma.lambdaPosPiTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.lambdaNegPrTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.aLambdaPrTOFNSigma()) < LambdaMaxTOFNSigmas) && (TMath::Abs(sigma.aLambdaPiTOFNSigma()) < LambdaMaxTOFNSigmas)) {
+          //if ((TMath::Abs(sigma.lambdaPosPiTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.lambdaNegPrTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.aLambdaPrTOFNSigma()) < LambdaMaxTOFNSigmas) && (TMath::Abs(sigma.aLambdaPiTOFNSigma()) < LambdaMaxTOFNSigmas)) {
+          if ((TMath::Abs(sigma.lambdaPosPiTPCNSigma()) < 1e+9) && (TMath::Abs(sigma.lambdaNegPrTPCNSigma()) < 1e+9) && (TMath::Abs(sigma.aLambdaPrTOFNSigma()) < 1e+9) && (TMath::Abs(sigma.aLambdaPiTOFNSigma()) < 1e+9)) {
             histos.fill(HIST("MC/h2dArmenterosAfterSel"), sigma.photonAlpha(), sigma.photonQt());
             histos.fill(HIST("GeneralQA/hAntiLambdaMassSelected"), sigma.antilambdaMass());
             histos.fill(HIST("MC/h2dArmenterosAfterSel"), sigma.lambdaAlpha(), sigma.lambdaQt());
@@ -591,7 +608,8 @@ struct sigmaanalysis {
         // PID selections
         histos.fill(HIST("GeneralQA/h2dTPCvsTOFNSigma_LambdaPr"), sigma.lambdaPosPrTPCNSigma(), sigma.lambdaPrTOFNSigma());
         histos.fill(HIST("GeneralQA/h2dTPCvsTOFNSigma_LambdaPi"), sigma.lambdaNegPiTPCNSigma(), sigma.lambdaPiTOFNSigma());
-        if ((TMath::Abs(sigma.lambdaPosPrTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.lambdaNegPiTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.lambdaPrTOFNSigma()) < LambdaMaxTOFNSigmas) && (TMath::Abs(sigma.lambdaPiTOFNSigma()) < LambdaMaxTOFNSigmas)) {
+        //if ((TMath::Abs(sigma.lambdaPosPrTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.lambdaNegPiTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.lambdaPrTOFNSigma()) < LambdaMaxTOFNSigmas) && (TMath::Abs(sigma.lambdaPiTOFNSigma()) < LambdaMaxTOFNSigmas)) {
+        if ((TMath::Abs(sigma.lambdaPosPrTPCNSigma()) < 1e+9) && (TMath::Abs(sigma.lambdaNegPiTPCNSigma()) < 1e+9) && (TMath::Abs(sigma.lambdaPrTOFNSigma()) < 1e+9) && (TMath::Abs(sigma.lambdaPiTOFNSigma()) < 1e+9)) {
           histos.fill(HIST("GeneralQA/h2dArmenterosAfterSel"), sigma.photonAlpha(), sigma.photonQt());
           histos.fill(HIST("GeneralQA/h2dArmenterosAfterSel"), sigma.lambdaAlpha(), sigma.lambdaQt());
           histos.fill(HIST("GeneralQA/hLambdaMassSelected"), sigma.lambdaMass());
@@ -605,7 +623,8 @@ struct sigmaanalysis {
         // PID selections
         histos.fill(HIST("GeneralQA/h2dTPCvsTOFNSigma_ALambdaPr"), sigma.lambdaNegPrTPCNSigma(), sigma.aLambdaPrTOFNSigma());
         histos.fill(HIST("GeneralQA/h2dTPCvsTOFNSigma_ALambdaPi"), sigma.lambdaPosPiTPCNSigma(), sigma.aLambdaPiTOFNSigma());
-        if ((TMath::Abs(sigma.lambdaPosPiTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.lambdaNegPrTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.aLambdaPrTOFNSigma()) < LambdaMaxTOFNSigmas) && (TMath::Abs(sigma.aLambdaPiTOFNSigma()) < LambdaMaxTOFNSigmas)) {
+        //if ((TMath::Abs(sigma.lambdaPosPiTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.lambdaNegPrTPCNSigma()) < LambdaMaxTPCNSigmas) && (TMath::Abs(sigma.aLambdaPrTOFNSigma()) < LambdaMaxTOFNSigmas) && (TMath::Abs(sigma.aLambdaPiTOFNSigma()) < LambdaMaxTOFNSigmas)) {
+        if ((TMath::Abs(sigma.lambdaPosPiTPCNSigma()) < 1e+9) && (TMath::Abs(sigma.lambdaNegPrTPCNSigma()) < 1e+9) && (TMath::Abs(sigma.aLambdaPrTOFNSigma()) < 1e+9) && (TMath::Abs(sigma.aLambdaPiTOFNSigma()) < 1e+9)) {
           histos.fill(HIST("GeneralQA/h2dArmenterosAfterSel"), sigma.photonAlpha(), sigma.photonQt());
           histos.fill(HIST("GeneralQA/h2dArmenterosAfterSel"), sigma.lambdaAlpha(), sigma.lambdaQt());
           histos.fill(HIST("GeneralQA/hAntiLambdaMassSelected"), sigma.antilambdaMass());

@@ -64,6 +64,9 @@ DECLARE_SOA_TABLE(Sigma0CollRefs, "AOD", "SIGMA0COLLREF", //! optional table to 
 // For Photon extra info
 namespace sigmaPhotonExtra
 {
+DECLARE_SOA_COLUMN(PhotonPx, photonPx, float);
+DECLARE_SOA_COLUMN(PhotonPy, photonPy, float);
+DECLARE_SOA_COLUMN(PhotonPz, photonPz, float);
 DECLARE_SOA_COLUMN(PhotonPt, photonPt, float);
 DECLARE_SOA_COLUMN(PhotonMass, photonMass, float);
 DECLARE_SOA_COLUMN(PhotonQt, photonQt, float);
@@ -93,11 +96,15 @@ DECLARE_SOA_COLUMN(PhotonNegITSCls, photonNegITSCls, int);
 DECLARE_SOA_COLUMN(PhotonPosITSClSize, photonPosITSClSize, uint32_t);
 DECLARE_SOA_COLUMN(PhotonNegITSClSize, photonNegITSClSize, uint32_t);
 DECLARE_SOA_COLUMN(PhotonV0Type, photonV0Type, uint8_t);
+DECLARE_SOA_COLUMN(IsPhotonFromPi0, isPhotonFromPi0, bool);
 DECLARE_SOA_COLUMN(GammaBDTScore, gammaBDTScore, float);
 
 } // namespace sigmaPhotonExtra
 
 DECLARE_SOA_TABLE(SigmaPhotonExtras, "AOD", "SIGMA0PHOTON",
+                  sigmaPhotonExtra::PhotonPx,
+                  sigmaPhotonExtra::PhotonPy,
+                  sigmaPhotonExtra::PhotonPz,
                   sigmaPhotonExtra::PhotonPt,
                   sigmaPhotonExtra::PhotonMass,
                   sigmaPhotonExtra::PhotonQt,
@@ -127,11 +134,15 @@ DECLARE_SOA_TABLE(SigmaPhotonExtras, "AOD", "SIGMA0PHOTON",
                   sigmaPhotonExtra::PhotonPosITSClSize,
                   sigmaPhotonExtra::PhotonNegITSClSize,
                   sigmaPhotonExtra::PhotonV0Type,
+                  sigmaPhotonExtra::IsPhotonFromPi0,
                   sigmaPhotonExtra::GammaBDTScore);
 
 // For Lambda extra info
 namespace sigmaLambdaExtra
 {
+DECLARE_SOA_COLUMN(LambdaPx, lambdaPx, float);
+DECLARE_SOA_COLUMN(LambdaPy, lambdaPy, float);
+DECLARE_SOA_COLUMN(LambdaPz, lambdaPz, float);
 DECLARE_SOA_COLUMN(LambdaPt, lambdaPt, float);
 DECLARE_SOA_COLUMN(LambdaMass, lambdaMass, float);
 DECLARE_SOA_COLUMN(AntiLambdaMass, antilambdaMass, float);
@@ -174,6 +185,9 @@ DECLARE_SOA_COLUMN(AntiLambdaBDTScore, antilambdaBDTScore, float);
 } // namespace sigmaLambdaExtra
 
 DECLARE_SOA_TABLE(SigmaLambdaExtras, "AOD", "SIGMA0LAMBDA",
+                  sigmaLambdaExtra::LambdaPx,
+                  sigmaLambdaExtra::LambdaPy,
+                  sigmaLambdaExtra::LambdaPz,                                    
                   sigmaLambdaExtra::LambdaPt,
                   sigmaLambdaExtra::LambdaMass,
                   sigmaLambdaExtra::AntiLambdaMass,
