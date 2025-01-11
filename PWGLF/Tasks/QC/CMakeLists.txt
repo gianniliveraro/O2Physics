@@ -124,3 +124,8 @@ o2physics_add_dpl_workflow(strange-derived-qa
     SOURCES strangederivedqa.cxx
     PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore
     COMPONENT_NAME Analysis)
+
+o2physics_add_dpl_workflow(sigma0qa
+    SOURCES sigma0QA.cxx
+    PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore
+    COMPONENT_NAME Analysis)
