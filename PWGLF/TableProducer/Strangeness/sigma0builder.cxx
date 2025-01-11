@@ -865,12 +865,15 @@ struct sigma0builder {
 
           bool fIsSigma = false;
           bool fIsAntiSigma = false;
+          float SigmaMCpT = RecoDecay::pt(array{gamma.pxMC() + lambda.pxMC(), gamma.pyMC() + lambda.pyMC()});
           bool fIsPhotonPrimary = gamma.isPhysicalPrimary();
           int PhotonCandPDGCode = gamma.pdgCode();
           int PhotonCandPDGCodeMother = gamma.pdgCodeMother();
+          float PhotonMCpT = RecoDecay::pt(array{gamma.pxMC(), gamma.pyMC()});
           bool fIsLambdaPrimary = lambda.isPhysicalPrimary();
           int LambdaCandPDGCode = lambda.pdgCode();
           int LambdaCandPDGCodeMother = lambda.pdgCodeMother();
+          float LambdaMCpT = RecoDecay::pt(array{lambda.pxMC(), lambda.pyMC()});
 
           if ((gamma.pdgCode() == 22) && (gamma.pdgCodeMother() == 3212) && (lambda.pdgCode() == 3122) && (lambda.pdgCodeMother() == 3212) && (gamma.motherMCPartId() == lambda.motherMCPartId())) {
             fIsSigma = true;
@@ -881,9 +884,9 @@ struct sigma0builder {
             histos.fill(HIST("MC/h2dPtVsCentrality_AntiSigma0AfterSel"), centrality, RecoDecay::pt(array{gamma.px() + lambda.px(), gamma.py() + lambda.py()}));
             // TH3D Mass histogram
           }
-          sigma0mccores(fIsSigma, fIsAntiSigma,
-                        PhotonCandPDGCode, PhotonCandPDGCodeMother, fIsPhotonPrimary,
-                        LambdaCandPDGCode, LambdaCandPDGCodeMother, fIsLambdaPrimary);
+          sigma0mccores(fIsSigma, fIsAntiSigma, SigmaMCpT,
+                        PhotonCandPDGCode, PhotonCandPDGCodeMother, fIsPhotonPrimary, PhotonMCpT,
+                        LambdaCandPDGCode, LambdaCandPDGCodeMother, fIsLambdaPrimary, LambdaMCpT);
 
           // QA histograms
           // Signal only (sigma0+antisigma0)
