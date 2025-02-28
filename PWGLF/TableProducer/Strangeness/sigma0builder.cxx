@@ -246,7 +246,40 @@ struct sigma0builder {
     histos.add("GeneralQA/h2dPtVsMassPi0AfterSel_Candidates", "h2dPtVsMassPi0AfterSel_Candidates", kTH2D, {axisPt, {500, 0.08f, 0.18f}});
     histos.add("GeneralQA/h3dV0XYZ", "h3dV0XYZ", kTH3F, {{400, -200, 200}, {400, -200, 200}, {240, -120.0f, 120.0f}});
 
+    // Specific photon QA
+    histos.add("PhotonSelQA/h2dPhotonBaseline", "h2dPhotonBaseline", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("PhotonSelQA/h2dPhotonEta", "h2dPhotonEta", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("PhotonSelQA/h2dPhotonDCADauToPV", "h2dPhotonDCADauToPV", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("PhotonSelQA/h2dPhotonDCADau", "h2dPhotonDCADau", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("PhotonSelQA/h2dPhotonRadius", "h2dPhotonRadius", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("PhotonSelQA/h2dPhotonSigma0Mass", "h2dPhotonSigma0Mass", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+
+    // Specific Lambda/ALambda QA
+    histos.add("LambdaSelQA/h2dLambdaBaseline", "h2dLambdaBaseline", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("LambdaSelQA/h2dLambdaDauEta", "h2dLambdaDauEta", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("LambdaSelQA/h2dLambdaDCADauToPV", "h2dLambdaDCADauToPV", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("LambdaSelQA/h2dLambdaRadius", "h2dLambdaRadius", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("LambdaSelQA/h2dLambdaDCADau", "h2dLambdaDCADau", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("LambdaSelQA/h2dLambdaSigma0Mass", "h2dLambdaSigma0Mass", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    
     // MC
+    // Specific photon QA
+    histos.add("MCTruePhotonSelQA/h2dPhotonBaseline", "h2dPhotonBaseline", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("MCTruePhotonSelQA/h2dPhotonEta", "h2dPhotonEta", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("MCTruePhotonSelQA/h2dPhotonDCADauToPV", "h2dPhotonDCADauToPV", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("MCTruePhotonSelQA/h2dPhotonDCADau", "h2dPhotonDCADau", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("MCTruePhotonSelQA/h2dPhotonRadius", "h2dPhotonRadius", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("MCTruePhotonSelQA/h2dPhotonSigma0Mass", "h2dPhotonSigma0Mass", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+
+    // Specific Lambda/ALambda QA
+    histos.add("MCTrueLambdaSelQA/h2dLambdaBaseline", "h2dLambdaBaseline", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("MCTrueLambdaSelQA/h2dLambdaMass", "h2dLambdaMass", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("MCTrueLambdaSelQA/h2dLambdaDauEta", "h2dLambdaDauEta", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("MCTrueLambdaSelQA/h2dLambdaDCADauToPV", "h2dLambdaDCADauToPV", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("MCTrueLambdaSelQA/h2dLambdaRadius", "h2dLambdaRadius", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("MCTrueLambdaSelQA/h2dLambdaDCADau", "h2dLambdaDCADau", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("MCTrueLambdaSelQA/h2dLambdaSigma0Mass", "h2dLambdaSigma0Mass", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    
     histos.add("MC/h2dPtVsCentrality_GammaBeforeSel", "h2dPtVsCentrality_GammaBeforeSel", kTH2D, {axisCentrality, axisPt});
     histos.add("MC/h2dPtVsCentrality_LambdaBeforeSel", "h2dPtVsCentrality_LambdaBeforeSel", kTH2D, {axisCentrality, axisPt});
     histos.add("MC/h2dPtVsCentrality_AntiLambdaBeforeSel", "h2dPtVsCentrality_AntiLambdaBeforeSel", kTH2D, {axisCentrality, axisPt});
@@ -283,7 +316,6 @@ struct sigma0builder {
     // For Pi0 QA
     histos.add("MC/h2dPtVsMassPi0BeforeSel_SignalOnly", "h2dPtVsMassPi0BeforeSel_SignalOnly", kTH2D, {axisPt, {500, 0.08f, 0.18f}});
     histos.add("MC/h2dPtVsMassPi0AfterSel_SignalOnly", "h2dPtVsMassPi0AfterSel_SignalOnly", kTH2D, {axisPt, {500, 0.08f, 0.18f}});
-
     histos.add("h3dMassSigmasBeforeSel", "h3dMassSigmasBeforeSel", kTH3F, {axisCentrality, axisPt, axisSigmaMass});
     histos.add("h3dMassSigmasAfterSel", "h3dMassSigmasAfterSel", kTH3F, {axisCentrality, axisPt, axisSigmaMass});
   }
@@ -510,6 +542,14 @@ struct sigma0builder {
     if ((gamma.posTrackExtraId() == lambda.posTrackExtraId()) || (gamma.negTrackExtraId() == lambda.negTrackExtraId()) || (gamma.posTrackExtraId() == lambda.negTrackExtraId()) || (gamma.negTrackExtraId() == lambda.posTrackExtraId()) || (gamma.posTrackExtraId() == lambda.negTrackExtraId()))
       return false;
 
+    bool isMCTrueLambda = false;
+    bool isMCTruePhoton = false;
+    if constexpr (requires { lambda.pdgCode(); gamma.pdgCode(); }) {
+      if (gamma.pdgCode() == 22)
+        isMCTruePhoton = true;
+      if ((lambda.pdgCode() == 3122) || (lambda.pdgCode() == -3122))
+        isMCTrueLambda = true;
+    }
     if (useMLScores) {
       // Gamma selection:
       if (gamma.gammaBDTScore() <= Gamma_MLThreshold)
@@ -520,30 +560,42 @@ struct sigma0builder {
         return false;
 
     } else {
+
       // Standard selection
       // Gamma basic selection criteria:
       histos.fill(HIST("hCandidateBuilderSelection"), 1.);
       histos.fill(HIST("Selection/hPhotonMass"), gamma.mGamma());
+
       if ((gamma.mGamma() < 0) || (gamma.mGamma() > PhotonMaxMass))
         return false;
+      if (isMCTruePhoton) histos.fill(HIST("MCTruePhotonSelQA/h2dPhotonBaseline"), gamma.pt(), gamma.mGamma());
+      histos.fill(HIST("PhotonSelQA/h2dPhotonBaseline"), gamma.pt(), gamma.mGamma());
       histos.fill(HIST("Selection/hPhotonNegEta"), gamma.negativeeta());
       histos.fill(HIST("Selection/hPhotonPosEta"), gamma.positiveeta());
       histos.fill(HIST("hCandidateBuilderSelection"), 2.);
       if ((TMath::Abs(gamma.negativeeta()) > PhotonMaxDauPseudoRap) || (TMath::Abs(gamma.positiveeta()) > PhotonMaxDauPseudoRap))
         return false;
+      if (isMCTruePhoton) histos.fill(HIST("MCTruePhotonSelQA/h2dPhotonEta"), gamma.pt(), gamma.mGamma());
+      histos.fill(HIST("PhotonSelQA/h2dPhotonEta"), gamma.pt(), gamma.mGamma());
       histos.fill(HIST("Selection/hPhotonDCANegToPV"), TMath::Abs(gamma.dcanegtopv()));
       histos.fill(HIST("Selection/hPhotonDCAPosToPV"), TMath::Abs(gamma.dcapostopv()));
       histos.fill(HIST("hCandidateBuilderSelection"), 3.);
       if ((TMath::Abs(gamma.dcapostopv()) < PhotonMinDCAToPv) || (TMath::Abs(gamma.dcanegtopv()) < PhotonMinDCAToPv))
         return false;
+      if (isMCTruePhoton) histos.fill(HIST("MCTruePhotonSelQA/h2dPhotonDCADauToPV"), gamma.pt(), gamma.mGamma());
+      histos.fill(HIST("PhotonSelQA/h2dPhotonDCADauToPV"), gamma.pt(), gamma.mGamma());
       histos.fill(HIST("Selection/hPhotonDCADau"), TMath::Abs(gamma.dcaV0daughters()));
       histos.fill(HIST("hCandidateBuilderSelection"), 4.);
       if (TMath::Abs(gamma.dcaV0daughters()) > PhotonMaxDCAV0Dau)
         return false;
+      if (isMCTruePhoton) histos.fill(HIST("MCTruePhotonSelQA/h2dPhotonDCADau"), gamma.pt(), gamma.mGamma());
+      histos.fill(HIST("PhotonSelQA/h2dPhotonDCADau"), gamma.pt(), gamma.mGamma());
       histos.fill(HIST("Selection/hPhotonRadius"), gamma.v0radius());
       histos.fill(HIST("hCandidateBuilderSelection"), 5.);
       if ((gamma.v0radius() < PhotonMinRadius) || (gamma.v0radius() > PhotonMaxRadius))
         return false;
+      if (isMCTruePhoton) histos.fill(HIST("MCTruePhotonSelQA/h2dPhotonRadius"), gamma.pt(), gamma.mGamma());
+      histos.fill(HIST("PhotonSelQA/h2dPhotonRadius"), gamma.pt(), gamma.mGamma());
 
       // Lambda basic selection criteria:
       histos.fill(HIST("hCandidateBuilderSelection"), 6.);
@@ -551,24 +603,34 @@ struct sigma0builder {
       histos.fill(HIST("Selection/hAntiLambdaMass"), lambda.mAntiLambda());
       if ((TMath::Abs(lambda.mLambda() - o2::constants::physics::MassLambda0) > LambdaWindow) && (TMath::Abs(lambda.mAntiLambda() - o2::constants::physics::MassLambda0) > LambdaWindow))
         return false;
+      if (isMCTrueLambda) histos.fill(HIST("MCTrueLambdaSelQA/h2dLambdaBaseline"), lambda.pt(), lambda.mLambda());
+      histos.fill(HIST("LambdaSelQA/h2dLambdaBaseline"), lambda.pt(), lambda.mLambda());
       histos.fill(HIST("Selection/hLambdaNegEta"), lambda.negativeeta());
       histos.fill(HIST("Selection/hLambdaPosEta"), lambda.positiveeta());
       histos.fill(HIST("hCandidateBuilderSelection"), 7.);
       if ((TMath::Abs(lambda.negativeeta()) > LambdaDauPseudoRap) || (TMath::Abs(lambda.positiveeta()) > LambdaDauPseudoRap))
         return false;
+      if (isMCTrueLambda) histos.fill(HIST("MCTrueLambdaSelQA/h2dLambdaDauEta"), lambda.pt(), lambda.mLambda());
+      histos.fill(HIST("LambdaSelQA/h2dLambdaDauEta"), lambda.pt(), lambda.mLambda());
       histos.fill(HIST("Selection/hLambdaDCANegToPV"), lambda.dcanegtopv());
       histos.fill(HIST("Selection/hLambdaDCAPosToPV"), lambda.dcapostopv());
       histos.fill(HIST("hCandidateBuilderSelection"), 8.);
       if ((TMath::Abs(lambda.dcapostopv()) < LambdaMinDCAPosToPv) || (TMath::Abs(lambda.dcanegtopv()) < LambdaMinDCANegToPv))
         return false;
+      if (isMCTrueLambda) histos.fill(HIST("MCTrueLambdaSelQA/h2dLambdaDCADauToPV"), lambda.pt(), lambda.mLambda());
+      histos.fill(HIST("LambdaSelQA/h2dLambdaDCADauToPV"), lambda.pt(), lambda.mLambda());
       histos.fill(HIST("Selection/hLambdaRadius"), lambda.v0radius());
       histos.fill(HIST("hCandidateBuilderSelection"), 9.);
       if ((lambda.v0radius() < LambdaMinv0radius) || (lambda.v0radius() > LambdaMaxv0radius))
         return false;
+      if (isMCTrueLambda) histos.fill(HIST("MCTrueLambdaSelQA/h2dLambdaRadius"), lambda.pt(), lambda.mLambda());
+      histos.fill(HIST("LambdaSelQA/h2dLambdaRadius"), lambda.pt(), lambda.mLambda());
       histos.fill(HIST("Selection/hLambdaDCADau"), lambda.dcaV0daughters());
       histos.fill(HIST("hCandidateBuilderSelection"), 10.);
       if (TMath::Abs(lambda.dcaV0daughters()) > LambdaMaxDCAV0Dau)
         return false;
+      if (isMCTrueLambda) histos.fill(HIST("MCTrueLambdaSelQA/h2dLambdaDCADau"), lambda.pt(), lambda.mLambda());
+      histos.fill(HIST("LambdaSelQA/h2dLambdaDCADau"), lambda.pt(), lambda.mLambda());
       histos.fill(HIST("hCandidateBuilderSelection"), 11.);
     }
     // Sigma0 candidate properties
@@ -615,8 +677,13 @@ struct sigma0builder {
       }
     }
 
-    if (TMath::Abs(sigmamass - 1.192642) > Sigma0Window)
+    if (TMath::Abs(sigmamass - o2::constants::physics::MassSigma0) > Sigma0Window)
       return false;
+
+    if (isMCTruePhoton) histos.fill(HIST("MCTruePhotonSelQA/h2dPhotonSigma0Mass"), gamma.pt(), gamma.mGamma());
+    histos.fill(HIST("PhotonSelQA/h2dPhotonSigma0Mass"), gamma.pt(), gamma.mGamma());
+    if (isMCTrueLambda) histos.fill(HIST("MCTrueLambdaSelQA/h2dLambdaSigma0Mass"), lambda.pt(), lambda.mLambda());
+    histos.fill(HIST("LambdaSelQA/h2dLambdaSigma0Mass"), lambda.pt(), lambda.mLambda());
 
     histos.fill(HIST("GeneralQA/h2dMassGammaVsK0SAfterMassSel"), gamma.mGamma(), gamma.mK0Short());
     histos.fill(HIST("GeneralQA/h2dMassLambdaVsK0SAfterMassSel"), lambda.mLambda(), lambda.mK0Short());

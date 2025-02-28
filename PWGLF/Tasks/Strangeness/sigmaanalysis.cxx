@@ -768,19 +768,19 @@ struct sigmaanalysis {
       //  Lambda selections
       histos.fill(HIST("GeneralQA/hCandidateAnalysisSelection"), 18.);
       histos.fill(HIST("GeneralQA/hLambdaRadius"), cand.lambdaRadius());
-      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow))
+      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow) && isLambdalike)
         histos.fill(HIST("LambdaSelQA/h2dLambdaBaseline"), cand.lambdaPt(), cand.lambdaMass());
       if ((cand.lambdaRadius() < LambdaMinv0radius) || (cand.lambdaRadius() > LambdaMaxv0radius))
         return false;
       histos.fill(HIST("SigmaSelQA/h2dLambdaRadius"), cand.sigmapT(), cand.sigmaMass());
-      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow))
+      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow) && isLambdalike)
         histos.fill(HIST("LambdaSelQA/h2dLambdaRadius"), cand.lambdaPt(), cand.lambdaMass());
       histos.fill(HIST("GeneralQA/hLambdaDCADau"), cand.lambdaDCADau());
       histos.fill(HIST("GeneralQA/hCandidateAnalysisSelection"), 19.);
       if (TMath::Abs(cand.lambdaDCADau()) > LambdaMaxDCAV0Dau)
         return false;
       histos.fill(HIST("SigmaSelQA/h2dLambdaDCADau"), cand.sigmapT(), cand.sigmaMass());
-      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow))
+      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow) && isLambdalike)
         histos.fill(HIST("LambdaSelQA/h2dLambdaDCADau"), cand.lambdaPt(), cand.lambdaMass());
       histos.fill(HIST("GeneralQA/h2dLambdaArmenteros"), cand.lambdaAlpha(), cand.lambdaQt());
       histos.fill(HIST("GeneralQA/hCandidateAnalysisSelection"), 20.);
@@ -790,14 +790,14 @@ struct sigmaanalysis {
       if ((TMath::Abs(cand.lambdaAlpha()) < LambdaMinAlpha) || (TMath::Abs(cand.lambdaAlpha()) > LambdaMaxAlpha))
         return false;
       histos.fill(HIST("SigmaSelQA/h2dLambdaArmenteros"), cand.sigmapT(), cand.sigmaMass());
-      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow))
+      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow) && isLambdalike)
         histos.fill(HIST("LambdaSelQA/h2dLambdaArmenteros"), cand.lambdaPt(), cand.lambdaMass());
       histos.fill(HIST("GeneralQA/hLambdaCosPA"), cand.lambdaCosPA());
       histos.fill(HIST("GeneralQA/hCandidateAnalysisSelection"), 22.);
       if (cand.lambdaCosPA() < LambdaMinv0cospa)
         return false;
       histos.fill(HIST("SigmaSelQA/h2dLambdaCosPA"), cand.sigmapT(), cand.sigmaMass());
-      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow))
+      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow) && isLambdalike)
         histos.fill(HIST("LambdaSelQA/h2dLambdaCosPA"), cand.lambdaPt(), cand.lambdaMass());
       histos.fill(HIST("GeneralQA/hLambdaY"), cand.lambdaY());
       histos.fill(HIST("GeneralQA/hLambdaPosEta"), cand.lambdaPosEta());
@@ -806,7 +806,7 @@ struct sigmaanalysis {
       if ((TMath::Abs(cand.lambdaY()) > LambdaMaxRap) || (TMath::Abs(cand.lambdaPosEta()) > LambdaMaxDauEta) || (TMath::Abs(cand.lambdaNegEta()) > LambdaMaxDauEta))
         return false;
       histos.fill(HIST("SigmaSelQA/h2dLambdaY"), cand.sigmapT(), cand.sigmaMass());
-      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow))
+      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow) && isLambdalike)
         histos.fill(HIST("LambdaSelQA/h2dLambdaY"), cand.lambdaPt(), cand.lambdaMass());
       histos.fill(HIST("GeneralQA/hLambdaPosTPCCR"), cand.lambdaPosTPCCrossedRows());
       histos.fill(HIST("GeneralQA/hLambdaNegTPCCR"), cand.lambdaNegTPCCrossedRows());
@@ -814,7 +814,7 @@ struct sigmaanalysis {
       if ((cand.lambdaPosTPCCrossedRows() < LambdaMinTPCCrossedRows) || (cand.lambdaNegTPCCrossedRows() < LambdaMinTPCCrossedRows))
         return false;
       histos.fill(HIST("SigmaSelQA/h2dLambdaDauTPCCR"), cand.sigmapT(), cand.sigmaMass());
-      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow))
+      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow) && isLambdalike)
         histos.fill(HIST("LambdaSelQA/h2dLambdaDauTPCCR"), cand.lambdaPt(), cand.lambdaMass());
       histos.fill(HIST("GeneralQA/hLambdaPosITSCls"), cand.lambdaPosITSCls());
       histos.fill(HIST("GeneralQA/hLambdaNegITSCls"), cand.lambdaNegITSCls());
@@ -829,14 +829,14 @@ struct sigmaanalysis {
       if (cand.lambdaNegITSCls() < LambdaMinITSclusters && (!LambdaRejectNegITSafterburner || negIsFromAfterburner))
         return false;
       histos.fill(HIST("SigmaSelQA/h2dLambdaDauITSCls"), cand.sigmapT(), cand.sigmaMass());
-      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow))
+      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow) && isLambdalike)
         histos.fill(HIST("LambdaSelQA/h2dLambdaDauITSCls"), cand.lambdaPt(), cand.lambdaMass());
       histos.fill(HIST("GeneralQA/hLambdaLifeTime"), cand.lambdaLifeTime());
       histos.fill(HIST("GeneralQA/hCandidateAnalysisSelection"), 26.);
       if (cand.lambdaLifeTime() > LambdaMaxLifeTime)
         return false;
       histos.fill(HIST("SigmaSelQA/h2dLambdaLifeTime"), cand.sigmapT(), cand.sigmaMass());
-      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow))
+      if ((isMCTrueLambda || doPhotonLambdaSelQA) && (TMath::Abs(cand.lambdaMass() - o2::constants::physics::MassLambda0) < LambdaWindow) && isLambdalike)
         histos.fill(HIST("LambdaSelQA/h2dLambdaLifeTime"), cand.lambdaPt(), cand.lambdaMass());
       histos.fill(HIST("GeneralQA/hCandidateAnalysisSelection"), 27.);
       // Separating lambda and antilambda selections:
