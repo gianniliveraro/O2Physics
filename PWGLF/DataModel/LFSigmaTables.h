@@ -216,10 +216,14 @@ DECLARE_SOA_COLUMN(PhotonCandPDGCode, photonCandPDGCode, int);
 DECLARE_SOA_COLUMN(PhotonCandPDGCodeMother, photonCandPDGCodeMother, int);
 DECLARE_SOA_COLUMN(IsPhotonCandPrimary, isPhotonCandPrimary, bool);
 DECLARE_SOA_COLUMN(PhotonMCPt, photonMCPt, float);
+DECLARE_SOA_COLUMN(PhotonPosMCPt, photonPosMCPt, float);
+DECLARE_SOA_COLUMN(PhotonNegMCPt, photonNegMCPt, float);
 DECLARE_SOA_COLUMN(LambdaCandPDGCode, lambdaCandPDGCode, int);
 DECLARE_SOA_COLUMN(LambdaCandPDGCodeMother, lambdaCandPDGCodeMother, int);
 DECLARE_SOA_COLUMN(IsLambdaCandPrimary, isLambdaCandPrimary, bool);
 DECLARE_SOA_COLUMN(LambdaMCPt, lambdaMCPt, float);
+DECLARE_SOA_COLUMN(LambdaPosMCPt, lambdaPosMCPt, float);
+DECLARE_SOA_COLUMN(LambdaNegMCPt, lambdaNegMCPt, float);
 
 } // namespace sigmaMCCore
 
@@ -231,10 +235,14 @@ DECLARE_SOA_TABLE(SigmaMCCores, "AOD", "SIGMA0MCCORES",
                   sigmaMCCore::PhotonCandPDGCodeMother,
                   sigmaMCCore::IsPhotonCandPrimary,
                   sigmaMCCore::PhotonMCPt,
+                  sigmaMCCore::PhotonPosMCPt,
+                  sigmaMCCore::PhotonNegMCPt,
                   sigmaMCCore::LambdaCandPDGCode,
                   sigmaMCCore::LambdaCandPDGCodeMother,
                   sigmaMCCore::IsLambdaCandPrimary,
-                  sigmaMCCore::LambdaMCPt);
+                  sigmaMCCore::LambdaMCPt,
+                  sigmaMCCore::LambdaPosMCPt,
+                  sigmaMCCore::LambdaNegMCPt);
 } // namespace o2::aod
 
 #endif // PWGLF_DATAMODEL_LFSIGMATABLES_H_

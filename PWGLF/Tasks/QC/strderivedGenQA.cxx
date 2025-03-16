@@ -690,6 +690,14 @@ struct strderivedGenQA {
 
     for (auto const& v0 : V0s) {
 
+      if (!IsEventAccepted(coll)) {
+        continue;
+      }
+
+      if (v0.v0Type()!=v0Selections.v0TypeSelection) {
+        continue;
+      }
+
       // V0-Level
       float V0Y_Gamma = RecoDecay::y(std::array{v0.px(), v0.py(), v0.pz()}, o2::constants::physics::MassGamma);
       float V0Y_Lambda = RecoDecay::y(std::array{v0.px(), v0.py(), v0.pz()}, o2::constants::physics::MassLambda);
@@ -771,12 +779,20 @@ struct strderivedGenQA {
     }
   }
 
-  void processMCDerivedV0s(V0DerivedMCDatas const& V0s, dauTracks const&, aod::MotherMCParts const&, soa::Join<aod::V0MCCores, aod::V0MCCollRefs> const&)
+  void processMCDerivedV0s(StrCollisionsDatas::iterator const& coll, V0DerivedMCDatas const& V0s, dauTracks const&, aod::MotherMCParts const&, soa::Join<aod::V0MCCores, aod::V0MCCollRefs> const&)
   {
     for (auto const& v0 : V0s) {
       histos.fill(HIST("MCV0/hv0MCCore"), v0.has_v0MCCore());
       if (!v0.has_v0MCCore())
         continue;
+
+      if (!IsEventAccepted(coll)) {
+        continue;
+      }
+
+      if (v0.v0Type()!=v0Selections.v0TypeSelection) {
+        continue;
+      }
 
       auto v0MC = v0.v0MCCore_as<soa::Join<aod::V0MCCores, aod::V0MCCollRefs>>();
 

@@ -38,6 +38,7 @@
 #include "Common/DataModel/EventSelection.h"
 #include "Common/DataModel/Centrality.h"
 #include "Common/DataModel/PIDResponse.h"
+#include "Common/CCDB/ctpRateFetcher.h"
 #include "PWGLF/DataModel/LFStrangenessTables.h"
 #include "PWGLF/DataModel/LFStrangenessPIDTables.h"
 #include "PWGLF/DataModel/LFStrangenessMLTables.h"
@@ -60,6 +61,9 @@ using V0DerivedMCDatas = soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras,
 using V0StandardDerivedDatas = soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0TOFPIDs, aod::V0TOFNSigmas, aod::V0LambdaMLScores, aod::V0AntiLambdaMLScores, aod::V0GammaMLScores>;
 
 struct sigma0builder {
+  Service<o2::ccdb::BasicCCDBManager> ccdb;
+  ctpRateFetcher rateFetcher;
+
   SliceCache cache;
 
   Produces<aod::Sigma0Cores> sigma0cores;             // save sigma0 candidates for analysis
@@ -70,11 +74,14 @@ struct sigma0builder {
   // For manual sliceBy
   Preslice<V0DerivedMCDatas> perCollisionMCDerived = o2::aod::v0data::straCollisionId;
   Preslice<V0StandardDerivedDatas> perCollisionSTDDerived = o2::aod::v0data::straCollisionId;
+  PresliceUnsorted<soa::Join<aod::StraCollisions, aod::StraCents, aod::StraEvSels, aod::StraCollLabels>> perMcCollision = aod::v0data::straMCCollisionId;
 
   // Histogram registry
   HistogramRegistry histos{"Histos", {}, OutputObjHandlingPolicy::AnalysisObject};
 
   // Event selection
+  Configurable<bool> doCollisionAssociationQA{"doCollisionAssociationQA", true, "check collision association"};
+  Configurable<std::string> irSource{"irSource", "T0VTX", "Estimator of the interaction rate (Recommended: pp --> T0VTX, Pb-Pb --> ZNC hadronic)"};
   Configurable<bool> doPPAnalysis{"doPPAnalysis", true, "if in pp, set to true"};
 
   struct : ConfigurableGroup {
@@ -93,7 +100,7 @@ struct sigma0builder {
     Configurable<bool> requireNoCollInTimeRangeVzDep{"requireNoCollInTimeRangeVzDep", false, "reject collisions corrupted by the cannibalism, with other collisions with pvZ of drifting TPC tracks from past/future collisions within 2.5 cm the current pvZ"};
     Configurable<bool> requireNoCollInROFStd{"requireNoCollInROFStd", false, "reject collisions corrupted by the cannibalism, with other collisions within the same ITS ROF with mult. above a certain threshold"};
     Configurable<bool> requireNoCollInROFStrict{"requireNoCollInROFStrict", false, "reject collisions corrupted by the cannibalism, with other collisions within the same ITS ROF"};
-    Configurable<bool> requireINEL0{"requireINEL0", false, "require INEL>0 event selection"};
+    Configurable<bool> requireINEL0{"requireINEL0", true, "require INEL>0 event selection"};
     Configurable<bool> requireINEL1{"requireINEL1", false, "require INEL>1 event selection"};
     Configurable<float> maxZVtxPosition{"maxZVtxPosition", 10., "max Z vtx position"};
     Configurable<bool> useFT0CbasedOccupancy{"useFT0CbasedOccupancy", false, "Use sum of FT0-C amplitudes for estimating occupancy? (if not, use track-based definition)"};
@@ -150,6 +157,9 @@ struct sigma0builder {
   ConfigurableAxis axisCentrality{"axisCentrality", {VARIABLE_WIDTH, 0.0f, 5.0f, 10.0f, 20.0f, 30.0f, 40.0f, 50.0f, 60.0f, 70.0f, 80.0f, 90.0f, 100.0f, 110.0f}, "Centrality"};
   ConfigurableAxis axisInvPt{"axisInvPt", {VARIABLE_WIDTH, 0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 5.0, 10.0, 20.0, 50.0}, ""};
   ConfigurableAxis axisDeltaPt{"axisDeltaPt", {200, -500.0, 500.0}, ""};
+  ConfigurableAxis axisCosPA{"axisCosPA", {200, 0.5f, 1.0f}, "Cosine of pointing angle"};
+  ConfigurableAxis axisDeltaTimeStamp{"axisDeltaTimeStamp", {2000, -1000.0f, 1000.0f}, "Delta timestamp"};
+  ConfigurableAxis axisDeltaIdx{"axisDeltaIdx", {2000, -1000.0f, 1000.0f}, "Difference between coll indices"};
 
   // Invariant Mass
   ConfigurableAxis axisSigmaMass{"axisSigmaMass", {1000, 1.10f, 1.30f}, "M_{#Sigma^{0}} (GeV/c^{2})"};
@@ -170,36 +180,45 @@ struct sigma0builder {
   ConfigurableAxis axisRapidity{"axisRapidity", {100, -2.0f, 2.0f}, "Rapidity"};
   ConfigurableAxis axisCandSel{"axisCandSel", {13, 0.5f, +13.5f}, "Candidate Selection"};
 
+  // MC coll assoc QA axis
+  ConfigurableAxis axisMonteCarloNch{"axisMonteCarloNch", {300, 0.0f, 3000.0f}, "N_{ch} MC"};
+  ConfigurableAxis axisIRBinning{"axisIRBinning", {150, 0, 1500}, "Binning for the interaction rate (kHz)"};
+
   int nSigmaCandidates = 0;
   void init(InitContext const&)
   {
+    // setting CCDB service
+    ccdb->setURL("http://alice-ccdb.cern.ch");
+    ccdb->setCaching(true);
+    ccdb->setFatalWhenNull(false);
+    
     // Event Counters
-    histos.add("hEventSelection", "hEventSelection", kTH1F, {{20, -0.5f, +18.5f}});
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(1, "All collisions");
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(2, "sel8 cut");
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(3, "kIsTriggerTVX");
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(4, "kNoITSROFrameBorder");
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(5, "kNoTimeFrameBorder");
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(6, "posZ cut");
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(7, "kIsVertexITSTPC");
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(8, "kIsGoodZvtxFT0vsPV");
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(9, "kIsVertexTOFmatched");
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(10, "kIsVertexTRDmatched");
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(11, "kNoSameBunchPileup");
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(12, "kNoCollInTimeRangeStd");
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(13, "kNoCollInTimeRangeStrict");
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(14, "kNoCollInTimeRangeNarrow");
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(15, "kNoCollInRofStd");
-    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(16, "kNoCollInRofStrict");
+    histos.add("hEventSelection", "hEventSelection", kTH1D, {{20, -0.5f, +18.5f}});
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(0, "All collisions");
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(1, "sel8 cut");
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(2, "kIsTriggerTVX");
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(3, "kNoITSROFrameBorder");
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(4, "kNoTimeFrameBorder");
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(5, "posZ cut");
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(6, "kIsVertexITSTPC");
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(7, "kIsGoodZvtxFT0vsPV");
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(8, "kIsVertexTOFmatched");
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(9, "kIsVertexTRDmatched");
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(10, "kNoSameBunchPileup");
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(11, "kNoCollInTimeRangeStd");
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(12, "kNoCollInTimeRangeStrict");
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(13, "kNoCollInTimeRangeNarrow");
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(14, "kNoCollInRofStd");
+    histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(15, "kNoCollInRofStrict");
     if (doPPAnalysis) {
-      histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(17, "INEL>0");
-      histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(18, "INEL>1");
+      histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(16, "INEL>0");
+      histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(17, "INEL>1");
     } else {
-      histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(17, "Below min occup.");
-      histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(18, "Above max occup.");
+      histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(16, "Below min occup.");
+      histos.get<TH1>(HIST("hEventSelection"))->GetXaxis()->SetBinLabel(17, "Above max occup.");
     }
 
-    histos.add("hEventCentrality", "hEventCentrality", kTH1F, {axisCentrality});
+    histos.add("hEventCentrality", "hEventCentrality", kTH1D, {axisCentrality});
     histos.add("hCandidateBuilderSelection", "hCandidateBuilderSelection", kTH1F, {axisCandSel});
     histos.get<TH1>(HIST("hCandidateBuilderSelection"))->GetXaxis()->SetBinLabel(1, "No Sel");
     histos.get<TH1>(HIST("hCandidateBuilderSelection"))->GetXaxis()->SetBinLabel(2, "Photon Mass Cut");
@@ -235,6 +254,9 @@ struct sigma0builder {
     histos.add("Selection/hSigmaMassWindow", "hSigmaMassWindow", kTH1F, {{1000, -0.09f, 0.11f}});
     histos.add("Selection/hSigmaY", "hSigmaY", kTH1F, {axisRapidity});
 
+    histos.add("GeneralQA/hInteractionRate", "hInteractionRate", kTH1F, {axisIRBinning});
+    histos.add("GeneralQA/hCentralityVsInteractionRate", "hCentralityVsInteractionRate", kTH2F, {axisCentrality, axisIRBinning});
+
     histos.add("GeneralQA/h2dMassGammaVsK0S", "h2dMassGammaVsK0S", kTH2D, {axisPhotonMass, {200, 0.4f, 0.6f}});
     histos.add("GeneralQA/h2dMassLambdaVsK0S", "h2dMassLambdaVsK0S", kTH2D, {axisLambdaMass, {200, 0.4f, 0.6f}});
     histos.add("GeneralQA/h2dMassGammaVsLambda", "h2dMassGammaVsLambda", kTH2D, {axisPhotonMass, axisLambdaMass});
@@ -246,7 +268,40 @@ struct sigma0builder {
     histos.add("GeneralQA/h2dPtVsMassPi0AfterSel_Candidates", "h2dPtVsMassPi0AfterSel_Candidates", kTH2D, {axisPt, {500, 0.08f, 0.18f}});
     histos.add("GeneralQA/h3dV0XYZ", "h3dV0XYZ", kTH3F, {{400, -200, 200}, {400, -200, 200}, {240, -120.0f, 120.0f}});
 
+    // Specific photon QA
+    histos.add("PhotonSelQA/h2dPhotonBaseline", "h2dPhotonBaseline", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("PhotonSelQA/h2dPhotonEta", "h2dPhotonEta", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("PhotonSelQA/h2dPhotonDCADauToPV", "h2dPhotonDCADauToPV", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("PhotonSelQA/h2dPhotonDCADau", "h2dPhotonDCADau", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("PhotonSelQA/h2dPhotonRadius", "h2dPhotonRadius", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("PhotonSelQA/h2dPhotonSigma0Mass", "h2dPhotonSigma0Mass", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+
+    // Specific Lambda/ALambda QA
+    histos.add("LambdaSelQA/h2dLambdaBaseline", "h2dLambdaBaseline", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("LambdaSelQA/h2dLambdaDauEta", "h2dLambdaDauEta", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("LambdaSelQA/h2dLambdaDCADauToPV", "h2dLambdaDCADauToPV", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("LambdaSelQA/h2dLambdaRadius", "h2dLambdaRadius", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("LambdaSelQA/h2dLambdaDCADau", "h2dLambdaDCADau", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("LambdaSelQA/h2dLambdaSigma0Mass", "h2dLambdaSigma0Mass", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    
     // MC
+    // Specific photon QA
+    histos.add("MCTruePhotonSelQA/h2dPhotonBaseline", "h2dPhotonBaseline", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("MCTruePhotonSelQA/h2dPhotonEta", "h2dPhotonEta", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("MCTruePhotonSelQA/h2dPhotonDCADauToPV", "h2dPhotonDCADauToPV", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("MCTruePhotonSelQA/h2dPhotonDCADau", "h2dPhotonDCADau", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("MCTruePhotonSelQA/h2dPhotonRadius", "h2dPhotonRadius", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+    histos.add("MCTruePhotonSelQA/h2dPhotonSigma0Mass", "h2dPhotonSigma0Mass", {HistType::kTH2F, {axisPt, axisPhotonMass}});
+
+    // Specific Lambda/ALambda QA
+    histos.add("MCTrueLambdaSelQA/h2dLambdaBaseline", "h2dLambdaBaseline", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("MCTrueLambdaSelQA/h2dLambdaMass", "h2dLambdaMass", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("MCTrueLambdaSelQA/h2dLambdaDauEta", "h2dLambdaDauEta", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("MCTrueLambdaSelQA/h2dLambdaDCADauToPV", "h2dLambdaDCADauToPV", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("MCTrueLambdaSelQA/h2dLambdaRadius", "h2dLambdaRadius", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("MCTrueLambdaSelQA/h2dLambdaDCADau", "h2dLambdaDCADau", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    histos.add("MCTrueLambdaSelQA/h2dLambdaSigma0Mass", "h2dLambdaSigma0Mass", {HistType::kTH2F, {axisPt, axisLambdaMass}});
+    
     histos.add("MC/h2dPtVsCentrality_GammaBeforeSel", "h2dPtVsCentrality_GammaBeforeSel", kTH2D, {axisCentrality, axisPt});
     histos.add("MC/h2dPtVsCentrality_LambdaBeforeSel", "h2dPtVsCentrality_LambdaBeforeSel", kTH2D, {axisCentrality, axisPt});
     histos.add("MC/h2dPtVsCentrality_AntiLambdaBeforeSel", "h2dPtVsCentrality_AntiLambdaBeforeSel", kTH2D, {axisCentrality, axisPt});
@@ -283,9 +338,43 @@ struct sigma0builder {
     // For Pi0 QA
     histos.add("MC/h2dPtVsMassPi0BeforeSel_SignalOnly", "h2dPtVsMassPi0BeforeSel_SignalOnly", kTH2D, {axisPt, {500, 0.08f, 0.18f}});
     histos.add("MC/h2dPtVsMassPi0AfterSel_SignalOnly", "h2dPtVsMassPi0AfterSel_SignalOnly", kTH2D, {axisPt, {500, 0.08f, 0.18f}});
-
     histos.add("h3dMassSigmasBeforeSel", "h3dMassSigmasBeforeSel", kTH3F, {axisCentrality, axisPt, axisSigmaMass});
     histos.add("h3dMassSigmasAfterSel", "h3dMassSigmasAfterSel", kTH3F, {axisCentrality, axisPt, axisSigmaMass});
+
+    // To check V0 association to collisions
+    histos.add("V0MCQA/h3dNchVsIRPtVsPt_GammaType7", "h3dNchVsIRPtVsPt_GammaType7", kTH3F, {axisMonteCarloNch, axisIRBinning, axisPt});
+    histos.add("V0MCQA/h3dNchVsIRPtVsPt_GammaType7_BadCollAssig", "h3dNchVsIRPtVsPt_GammaType7_BadCollAssig", kTH3F, {axisMonteCarloNch, axisIRBinning, axisPt});
+    histos.add("V0MCQA/h3dNchVsIRPtVsPt_Gamma", "h3dNchVsIRPtVsPt_Gamma", kTH3F, {axisMonteCarloNch, axisIRBinning, axisPt});
+    histos.add("V0MCQA/h3dNchVsIRPtVsPt_Gamma_BadCollAssig", "h3dNchVsIRPtVsPt_Gamma_BadCollAssig", kTH3F, {axisMonteCarloNch, axisIRBinning, axisPt});
+    histos.add("V0MCQA/h3dNchVsIRPtVsPt_Lambda", "h3dNchVsIRPtVsPt_Lambda", kTH3F, {axisMonteCarloNch, axisIRBinning, axisPt});
+    histos.add("V0MCQA/h3dNchVsIRPtVsPt_Lambda_BadCollAssig", "h3dNchVsIRPtVsPt_Lambda_BadCollAssig", kTH3F, {axisMonteCarloNch, axisIRBinning, axisPt});
+    histos.add("V0MCQA/h3dNchVsIRPtVsPt_LambdaType1", "h3dNchVsIRPtVsPt_LambdaType1", kTH3F, {axisMonteCarloNch, axisIRBinning, axisPt});
+    histos.add("V0MCQA/h3dNchVsIRPtVsPt_LambdaType1_BadCollAssig", "h3dNchVsIRPtVsPt_LambdaType1_BadCollAssig", kTH3F, {axisMonteCarloNch, axisIRBinning, axisPt});
+    histos.add("V0MCQA/h3dNchVsIRPtVsPt_ALambda", "h3dNchVsIRPtVsPt_ALambda", kTH3F, {axisMonteCarloNch, axisIRBinning, axisPt});
+    histos.add("V0MCQA/h3dNchVsIRPtVsPt_ALambda_BadCollAssig", "h3dNchVsIRPtVsPt_ALambda_BadCollAssig", kTH3F, {axisMonteCarloNch, axisIRBinning, axisPt});
+    
+    histos.add("V0MCQA/hIsTrueMCCollReco", "hIsTrueMCCollReco", kTH1D, {{2, 0.0f, 2.0f}});
+    histos.get<TH1>(HIST("V0MCQA/hIsTrueMCCollReco"))->GetXaxis()->SetBinLabel(1, "No reco");
+    histos.get<TH1>(HIST("V0MCQA/hIsTrueMCCollReco"))->GetXaxis()->SetBinLabel(2, "Reconstructed");
+
+    histos.add("V0MCQA/hdeltaTimeStamp", "hdeltaTimeStamp", kTH1D, {axisDeltaTimeStamp});
+    histos.add("V0MCQA/hdeltaCollIdx", "hdeltaCollIdx", kTH1D, {axisDeltaIdx});
+    histos.add("V0MCQA/hGammaType7CosPA_All", "hGammaType7CosPA_All", kTH1D, {axisCosPA});
+    histos.add("V0MCQA/hGammaCosPA_All", "hGammaCosPA_All", kTH1D, {axisCosPA});
+    histos.add("V0MCQA/hGammaCosPA_WrongAssoc", "hGammaCosPA_WrongAssoc", kTH1D, {axisCosPA});
+    histos.add("V0MCQA/hGammaCosPA_WrongAssocToTrueColl", "hGammaCosPA_WrongAssocToTrueColl", kTH1D, {axisCosPA});
+    histos.add("V0MCQA/h2dGammaCosPA_WrongVsTrueColl", "h2dGammaCosPA_WrongVsTrueColl", kTH2D, {axisCosPA, axisCosPA});
+
+    histos.add("V0MCQA/h3dDeltaTimeVsIRVsPt_GammaType7", "h3dDeltaTimeVsIRVsPt_GammaType7", kTH3F, {axisDeltaTimeStamp, axisIRBinning, axisPt});
+    histos.add("V0MCQA/h3dDeltaIdxVsIRVsPt_GammaType7", "h3dDeltaIdxVsIRVsPt_GammaType7", kTH3F, {axisDeltaIdx, axisIRBinning, axisPt});
+    
+    histos.add("V0MCQA/h3dCosPAVsIRVsPt_GammaWrongAssoc", "h3dCosPAVsIRVsPt_GammaWrongAssoc", kTH3F, {axisCosPA, axisIRBinning, axisPt});
+    histos.add("V0MCQA/h3dCosPAVsIRVsPt_GammaWrongAssocToTrueColl", "h3dCosPAVsIRVsPt_GammaWrongAssocToTrueColl", kTH3F, {axisCosPA, axisIRBinning, axisPt});
+    
+
+    // histos.add("Gen/hSigmaMass", "hSigmaMass", kTH1F, {axisSigmaMass});
+    // histos.add("Gen/hSigmaPt", "hSigmaPt", kTH1F, {axisPt});
+    histos.add("Gen/hNEventsNch", "hNEventsNch", kTH1D, {axisMonteCarloNch});
   }
 
   template <typename TCollision>
@@ -394,6 +483,136 @@ struct sigma0builder {
         histos.fill(HIST("hEventSelection"), 17 /* Above max occupancy */);
     }
     return true;
+  }
+
+    // ______________________________________________________
+  // Return slicing output
+  template <typename TCollisions>
+  auto getGroupedCollisions(TCollisions const& collisions, int globalIndex)
+  {
+    return collisions.sliceBy(perMcCollision, globalIndex);  
+  }
+
+  // Return the list of indices to the recoed collision associated to a given MC collision.
+  template <typename TMCollisions, typename TCollisions>
+  std::vector<int> getListOfRecoCollIndices(TMCollisions const& mcCollisions, TCollisions const& collisions)
+  {
+    std::vector<int> listBestCollisionIdx(mcCollisions.size());
+    for (auto const& mcCollision : mcCollisions) {
+      auto groupedCollisions = getGroupedCollisions(collisions, mcCollision.globalIndex());
+      int biggestNContribs = -1;
+      int bestCollisionIndex = -1;
+      for (auto const& collision : groupedCollisions) {
+        // Find the collision with the biggest nbr of PV contributors
+        // Follows what was done here: https://github.com/AliceO2Group/O2Physics/blob/master/Common/TableProducer/mcCollsExtra.cxx#L93
+        if (biggestNContribs < collision.multPVTotalContributors()) {
+          biggestNContribs = collision.multPVTotalContributors();
+          bestCollisionIndex = collision.globalIndex();
+        }
+      }
+      listBestCollisionIdx[mcCollision.globalIndex()] = bestCollisionIndex;
+    }
+    return listBestCollisionIdx;
+  }
+
+  // Simulated processing (subscribes to MC information too)
+  template <typename TMCCollisions, typename TCollision, typename TV0s>
+  void analyseCollisionAssociation(TMCCollisions const& mcCollisions, TV0s const& fullV0s, TCollision const& collisions)
+  {
+    std::vector<int> listBestCollisionIdx = getListOfRecoCollIndices(mcCollisions, collisions);
+    
+    for (const auto& coll : collisions) {
+      if (!IsEventAccepted(coll, false)) {
+        continue;
+      }
+      // Do analysis with collision-grouped V0s, retain full collision information
+      const uint64_t collIdx = coll.globalIndex();
+      auto V0Table_thisCollision = fullV0s.sliceBy(perCollisionMCDerived, collIdx);
+
+      histos.fill(HIST("hEventCentrality"), coll.centFT0C());
+
+      // V0 table sliced
+      for (auto& v0 : V0Table_thisCollision) { // selecting photons from Sigma0
+        
+        if (!v0.has_v0MCCore())
+          continue;
+
+        auto v0MC = v0.template v0MCCore_as<soa::Join<aod::V0MCCores, aod::V0MCCollRefs>>(); 
+        float V0MCpT = RecoDecay::pt(array{v0MC.pxMC(), v0MC.pyMC()});
+
+        // check collision association explicitly
+        bool correctCollision = false;
+        int mcNch = -1;
+        if (coll.has_straMCCollision()) {
+          double interactionRate = rateFetcher.fetch(ccdb.service, coll.timestamp(), coll.runNumber(), irSource) * 1.e-3;
+
+          histos.fill(HIST("GeneralQA/hInteractionRate"), interactionRate);
+          histos.fill(HIST("GeneralQA/hCentralityVsInteractionRate"), coll.centFT0C(), interactionRate);
+
+          auto mcCollision = coll.template straMCCollision_as<soa::Join<aod::StraMCCollisions, aod::StraMCCollMults>>();
+          mcNch = mcCollision.multMCNParticlesEta05();
+          correctCollision = (v0MC.straMCCollisionId() == mcCollision.globalIndex());
+
+          if (v0MC.pdgCode() == 22){
+            if (v0.v0Type() == 7){
+              histos.fill(HIST("V0MCQA/hGammaType7CosPA_All"), v0.v0cosPA());
+              histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_GammaType7"), mcNch, interactionRate, V0MCpT);
+              if (!correctCollision){
+                histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_GammaType7_BadCollAssig"), mcNch, interactionRate, V0MCpT);
+                histos.fill(HIST("V0MCQA/hGammaCosPA_WrongAssoc"), v0.v0cosPA());
+
+                if (listBestCollisionIdx[v0MC.straMCCollisionId()]>-1){ // the true coll was reconstructed
+                  histos.fill(HIST("V0MCQA/hIsTrueMCCollReco"), 1);
+
+                  auto TrueCollision = collisions.iteratorAt(listBestCollisionIdx[v0MC.straMCCollisionId()]);
+
+                  float deltaTimeStamp = TrueCollision.timestamp() - coll.timestamp();
+                  float deltaCollIdx = TrueCollision.globalIndex() - coll.globalIndex();
+
+                  TVector3 pVecPVToV0(v0.x()-TrueCollision.posX(), v0.y()-TrueCollision.posY(), v0.z()-TrueCollision.posZ());
+                  TVector3 pVecV0(v0.px(), v0.py(), v0.pz());
+
+                  float PAToTrueColl = pVecPVToV0.Angle(pVecV0);
+                  float CosPAToTrueColl = TMath::Cos(PAToTrueColl);
+                  
+                  histos.fill(HIST("V0MCQA/hdeltaTimeStamp"), deltaTimeStamp);
+                  histos.fill(HIST("V0MCQA/hdeltaCollIdx"), deltaCollIdx);
+                  histos.fill(HIST("V0MCQA/hGammaCosPA_WrongAssocToTrueColl"), CosPAToTrueColl);
+                  histos.fill(HIST("V0MCQA/h2dGammaCosPA_WrongVsTrueColl"), v0.v0cosPA(), CosPAToTrueColl);
+                  histos.fill(HIST("V0MCQA/h3dDeltaTimeVsIRVsPt_GammaType7"), deltaTimeStamp, interactionRate, V0MCpT);              
+                  histos.fill(HIST("V0MCQA/h3dDeltaIdxVsIRVsPt_GammaType7"), deltaCollIdx, interactionRate, V0MCpT);              
+                  histos.fill(HIST("V0MCQA/h3dCosPAVsIRVsPt_GammaWrongAssoc"), v0.v0cosPA(), interactionRate, V0MCpT);              
+                  histos.fill(HIST("V0MCQA/h3dCosPAVsIRVsPt_GammaWrongAssocToTrueColl"), CosPAToTrueColl, interactionRate, V0MCpT);              
+
+                } else // the true coll was not reconstructed
+                  histos.fill(HIST("V0MCQA/hIsTrueMCCollReco"), 0);
+              }                
+            }
+            histos.fill(HIST("V0MCQA/hGammaCosPA_All"), v0.v0cosPA());
+            histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_Gamma"), mcNch, interactionRate, V0MCpT);
+            if (!correctCollision){
+              histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_Gamma_BadCollAssig"), mcNch, interactionRate, V0MCpT);              
+            }
+          }
+          if (v0MC.pdgCode() == 3122){ // Is Lambda
+            if (v0.v0Type() == 1){
+              histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_LambdaType1"), mcNch, interactionRate, V0MCpT);
+              if (!correctCollision)
+                histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_LambdaType1_BadCollAssig"), mcNch, interactionRate, V0MCpT);
+            }
+            histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_Lambda"), mcNch, interactionRate, V0MCpT);
+            if (!correctCollision)
+              histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_Lambda_BadCollAssig"), mcNch, interactionRate, V0MCpT);
+          
+          } 
+          if (v0MC.pdgCode() == -3122){ // Is AntiLambda
+            histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_ALambda"), mcNch, interactionRate, V0MCpT);
+            if (!correctCollision)
+              histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_ALambda_BadCollAssig"), mcNch, interactionRate, V0MCpT);
+          } 
+        }
+      }
+    }
   }
 
   template <typename TV0Object>
@@ -510,6 +729,18 @@ struct sigma0builder {
     if ((gamma.posTrackExtraId() == lambda.posTrackExtraId()) || (gamma.negTrackExtraId() == lambda.negTrackExtraId()) || (gamma.posTrackExtraId() == lambda.negTrackExtraId()) || (gamma.negTrackExtraId() == lambda.posTrackExtraId()) || (gamma.posTrackExtraId() == lambda.negTrackExtraId()))
       return false;
 
+    bool isMCTrueLambda = false;
+    bool isMCTruePhoton = false;
+    if constexpr (requires { gamma.v0MCCoreId(); lambda.v0MCCoreId(); }) {
+      if (gamma.has_v0MCCore() && lambda.has_v0MCCore()){
+        auto gammaMC = gamma.template v0MCCore_as<soa::Join<aod::V0MCCores, aod::V0MCCollRefs>>();
+        auto lambdaMC = lambda.template v0MCCore_as<soa::Join<aod::V0MCCores, aod::V0MCCollRefs>>();      
+        if (gammaMC.pdgCode() == 22)
+          isMCTruePhoton = true;
+        if ((lambdaMC.pdgCode() == 3122) || (lambdaMC.pdgCode() == -3122))
+          isMCTrueLambda = true;
+      }
+    }
     if (useMLScores) {
       // Gamma selection:
       if (gamma.gammaBDTScore() <= Gamma_MLThreshold)
@@ -520,30 +751,41 @@ struct sigma0builder {
         return false;
 
     } else {
+
       // Standard selection
       // Gamma basic selection criteria:
       histos.fill(HIST("hCandidateBuilderSelection"), 1.);
       histos.fill(HIST("Selection/hPhotonMass"), gamma.mGamma());
       if ((gamma.mGamma() < 0) || (gamma.mGamma() > PhotonMaxMass))
         return false;
+      if (isMCTruePhoton) histos.fill(HIST("MCTruePhotonSelQA/h2dPhotonBaseline"), gamma.pt(), gamma.mGamma());
+      histos.fill(HIST("PhotonSelQA/h2dPhotonBaseline"), gamma.pt(), gamma.mGamma());
       histos.fill(HIST("Selection/hPhotonNegEta"), gamma.negativeeta());
       histos.fill(HIST("Selection/hPhotonPosEta"), gamma.positiveeta());
       histos.fill(HIST("hCandidateBuilderSelection"), 2.);
       if ((TMath::Abs(gamma.negativeeta()) > PhotonMaxDauPseudoRap) || (TMath::Abs(gamma.positiveeta()) > PhotonMaxDauPseudoRap))
         return false;
+      if (isMCTruePhoton) histos.fill(HIST("MCTruePhotonSelQA/h2dPhotonEta"), gamma.pt(), gamma.mGamma());
+      histos.fill(HIST("PhotonSelQA/h2dPhotonEta"), gamma.pt(), gamma.mGamma());
       histos.fill(HIST("Selection/hPhotonDCANegToPV"), TMath::Abs(gamma.dcanegtopv()));
       histos.fill(HIST("Selection/hPhotonDCAPosToPV"), TMath::Abs(gamma.dcapostopv()));
       histos.fill(HIST("hCandidateBuilderSelection"), 3.);
       if ((TMath::Abs(gamma.dcapostopv()) < PhotonMinDCAToPv) || (TMath::Abs(gamma.dcanegtopv()) < PhotonMinDCAToPv))
         return false;
+      if (isMCTruePhoton) histos.fill(HIST("MCTruePhotonSelQA/h2dPhotonDCADauToPV"), gamma.pt(), gamma.mGamma());
+      histos.fill(HIST("PhotonSelQA/h2dPhotonDCADauToPV"), gamma.pt(), gamma.mGamma());
       histos.fill(HIST("Selection/hPhotonDCADau"), TMath::Abs(gamma.dcaV0daughters()));
       histos.fill(HIST("hCandidateBuilderSelection"), 4.);
       if (TMath::Abs(gamma.dcaV0daughters()) > PhotonMaxDCAV0Dau)
         return false;
+      if (isMCTruePhoton) histos.fill(HIST("MCTruePhotonSelQA/h2dPhotonDCADau"), gamma.pt(), gamma.mGamma());
+      histos.fill(HIST("PhotonSelQA/h2dPhotonDCADau"), gamma.pt(), gamma.mGamma());
       histos.fill(HIST("Selection/hPhotonRadius"), gamma.v0radius());
       histos.fill(HIST("hCandidateBuilderSelection"), 5.);
       if ((gamma.v0radius() < PhotonMinRadius) || (gamma.v0radius() > PhotonMaxRadius))
         return false;
+      if (isMCTruePhoton) histos.fill(HIST("MCTruePhotonSelQA/h2dPhotonRadius"), gamma.pt(), gamma.mGamma());
+      histos.fill(HIST("PhotonSelQA/h2dPhotonRadius"), gamma.pt(), gamma.mGamma());
 
       // Lambda basic selection criteria:
       histos.fill(HIST("hCandidateBuilderSelection"), 6.);
@@ -551,24 +793,34 @@ struct sigma0builder {
       histos.fill(HIST("Selection/hAntiLambdaMass"), lambda.mAntiLambda());
       if ((TMath::Abs(lambda.mLambda() - o2::constants::physics::MassLambda0) > LambdaWindow) && (TMath::Abs(lambda.mAntiLambda() - o2::constants::physics::MassLambda0) > LambdaWindow))
         return false;
+      if (isMCTrueLambda) histos.fill(HIST("MCTrueLambdaSelQA/h2dLambdaBaseline"), lambda.pt(), lambda.mLambda());
+      histos.fill(HIST("LambdaSelQA/h2dLambdaBaseline"), lambda.pt(), lambda.mLambda());
       histos.fill(HIST("Selection/hLambdaNegEta"), lambda.negativeeta());
       histos.fill(HIST("Selection/hLambdaPosEta"), lambda.positiveeta());
       histos.fill(HIST("hCandidateBuilderSelection"), 7.);
       if ((TMath::Abs(lambda.negativeeta()) > LambdaDauPseudoRap) || (TMath::Abs(lambda.positiveeta()) > LambdaDauPseudoRap))
         return false;
+      if (isMCTrueLambda) histos.fill(HIST("MCTrueLambdaSelQA/h2dLambdaDauEta"), lambda.pt(), lambda.mLambda());
+      histos.fill(HIST("LambdaSelQA/h2dLambdaDauEta"), lambda.pt(), lambda.mLambda());
       histos.fill(HIST("Selection/hLambdaDCANegToPV"), lambda.dcanegtopv());
       histos.fill(HIST("Selection/hLambdaDCAPosToPV"), lambda.dcapostopv());
       histos.fill(HIST("hCandidateBuilderSelection"), 8.);
       if ((TMath::Abs(lambda.dcapostopv()) < LambdaMinDCAPosToPv) || (TMath::Abs(lambda.dcanegtopv()) < LambdaMinDCANegToPv))
         return false;
+      if (isMCTrueLambda) histos.fill(HIST("MCTrueLambdaSelQA/h2dLambdaDCADauToPV"), lambda.pt(), lambda.mLambda());
+      histos.fill(HIST("LambdaSelQA/h2dLambdaDCADauToPV"), lambda.pt(), lambda.mLambda());
       histos.fill(HIST("Selection/hLambdaRadius"), lambda.v0radius());
       histos.fill(HIST("hCandidateBuilderSelection"), 9.);
       if ((lambda.v0radius() < LambdaMinv0radius) || (lambda.v0radius() > LambdaMaxv0radius))
         return false;
+      if (isMCTrueLambda) histos.fill(HIST("MCTrueLambdaSelQA/h2dLambdaRadius"), lambda.pt(), lambda.mLambda());
+      histos.fill(HIST("LambdaSelQA/h2dLambdaRadius"), lambda.pt(), lambda.mLambda());
       histos.fill(HIST("Selection/hLambdaDCADau"), lambda.dcaV0daughters());
       histos.fill(HIST("hCandidateBuilderSelection"), 10.);
       if (TMath::Abs(lambda.dcaV0daughters()) > LambdaMaxDCAV0Dau)
         return false;
+      if (isMCTrueLambda) histos.fill(HIST("MCTrueLambdaSelQA/h2dLambdaDCADau"), lambda.pt(), lambda.mLambda());
+      histos.fill(HIST("LambdaSelQA/h2dLambdaDCADau"), lambda.pt(), lambda.mLambda());
       histos.fill(HIST("hCandidateBuilderSelection"), 11.);
     }
     // Sigma0 candidate properties
@@ -586,37 +838,46 @@ struct sigma0builder {
     histos.fill(HIST("GeneralQA/h2dMassGammaVsLambda"), gamma.mGamma(), lambda.mLambda());
     histos.fill(HIST("GeneralQA/h3dMassSigma0VsDaupTs"), gamma.pt(), lambda.pt(), sigmamass);
 
-    if constexpr (requires { gamma.pdgCode(); } && requires { lambda.pdgCode(); }) {
+    if constexpr (requires { gamma.v0MCCoreId(); lambda.v0MCCoreId(); }) {
+      if (gamma.has_v0MCCore() && lambda.has_v0MCCore()) {
+        auto gammaMC = gamma.template v0MCCore_as<soa::Join<aod::V0MCCores, aod::V0MCCollRefs>>();
+        auto lambdaMC = lambda.template v0MCCore_as<soa::Join<aod::V0MCCores, aod::V0MCCollRefs>>();
 
-      histos.fill(HIST("MC/h2dPtVsMassSigma_All"), SigmapT, sigmamass);
+        histos.fill(HIST("MC/h2dPtVsMassSigma_All"), SigmapT, sigmamass);
 
-      // Real Gamma x Real Lambda - but not from the same sigma0/antisigma0!
-      if ((gamma.pdgCode() == 22) && ((lambda.pdgCode() == 3122) || (lambda.pdgCode() == -3122)) && (gamma.motherMCPartId() != lambda.motherMCPartId())) {
-        histos.fill(HIST("MC/h2dPtVsMassSigma_TrueDaughters"), SigmapT, sigmamass);
-        histos.fill(HIST("MC/h2dTrueDaughtersMatrix"), lambda.pdgCodeMother(), gamma.pdgCodeMother());
-      }
+        // Real Gamma x Real Lambda - but not from the same sigma0/antisigma0!
+        if ((gammaMC.pdgCode() == 22) && ((lambdaMC.pdgCode() == 3122) || (lambdaMC.pdgCode() == -3122)) && (gamma.motherMCPartId() != lambda.motherMCPartId())) {
+          histos.fill(HIST("MC/h2dPtVsMassSigma_TrueDaughters"), SigmapT, sigmamass);
+          histos.fill(HIST("MC/h2dTrueDaughtersMatrix"), lambdaMC.pdgCodeMother(), gammaMC.pdgCodeMother());
+        }
 
-      // Real Gamma x fake Lambda
-      if ((gamma.pdgCode() == 22) && (lambda.pdgCode() != 3122) && (lambda.pdgCode() != -3122)) {
-        histos.fill(HIST("MC/h2dPtVsMassSigma_TrueGammaFakeLambda"), SigmapT, sigmamass);
-        histos.fill(HIST("MC/h2dTrueGammaFakeLambdaMatrix"), lambda.pdgCodeMother(), gamma.pdgCodeMother());
-      }
+        // Real Gamma x fake Lambda
+        if ((gammaMC.pdgCode() == 22) && (lambdaMC.pdgCode() != 3122) && (lambdaMC.pdgCode() != -3122)) {
+          histos.fill(HIST("MC/h2dPtVsMassSigma_TrueGammaFakeLambda"), SigmapT, sigmamass);
+          histos.fill(HIST("MC/h2dTrueGammaFakeLambdaMatrix"), lambdaMC.pdgCodeMother(), gammaMC.pdgCodeMother());
+        }
 
-      // Fake Gamma x Real Lambda
-      if ((gamma.pdgCode() != 22) && ((lambda.pdgCode() == 3122) || (lambda.pdgCode() == -3122))) {
-        histos.fill(HIST("MC/h2dPtVsMassSigma_FakeGammaTrueLambda"), SigmapT, sigmamass);
-        histos.fill(HIST("MC/h2dFakeGammaTrueLambdaMatrix"), lambda.pdgCodeMother(), gamma.pdgCodeMother());
-      }
+        // Fake Gamma x Real Lambda
+        if ((gammaMC.pdgCode() != 22) && ((lambdaMC.pdgCode() == 3122) || (lambdaMC.pdgCode() == -3122))) {
+          histos.fill(HIST("MC/h2dPtVsMassSigma_FakeGammaTrueLambda"), SigmapT, sigmamass);
+          histos.fill(HIST("MC/h2dFakeGammaTrueLambdaMatrix"), lambdaMC.pdgCodeMother(), gammaMC.pdgCodeMother());
+        }
 
-      // Fake Gamma x Fake Lambda
-      if ((gamma.pdgCode() != 22) && (lambda.pdgCode() != 3122) && (lambda.pdgCode() != -3122)) {
-        histos.fill(HIST("MC/h2dPtVsMassSigma_FakeDaughters"), SigmapT, sigmamass);
-        histos.fill(HIST("MC/h2dFakeDaughtersMatrix"), lambda.pdgCodeMother(), gamma.pdgCodeMother());
+        // Fake Gamma x Fake Lambda
+        if ((gammaMC.pdgCode() != 22) && (lambdaMC.pdgCode() != 3122) && (lambdaMC.pdgCode() != -3122)) {
+          histos.fill(HIST("MC/h2dPtVsMassSigma_FakeDaughters"), SigmapT, sigmamass);
+          histos.fill(HIST("MC/h2dFakeDaughtersMatrix"), lambdaMC.pdgCodeMother(), gammaMC.pdgCodeMother());
+        }
       }
     }
 
-    if (TMath::Abs(sigmamass - 1.192642) > Sigma0Window)
+    if (TMath::Abs(sigmamass - o2::constants::physics::MassSigma0) > Sigma0Window)
       return false;
+
+    if (isMCTruePhoton) histos.fill(HIST("MCTruePhotonSelQA/h2dPhotonSigma0Mass"), gamma.pt(), gamma.mGamma());
+    histos.fill(HIST("PhotonSelQA/h2dPhotonSigma0Mass"), gamma.pt(), gamma.mGamma());
+    if (isMCTrueLambda) histos.fill(HIST("MCTrueLambdaSelQA/h2dLambdaSigma0Mass"), lambda.pt(), lambda.mLambda());
+    histos.fill(HIST("LambdaSelQA/h2dLambdaSigma0Mass"), lambda.pt(), lambda.mLambda());
 
     histos.fill(HIST("GeneralQA/h2dMassGammaVsK0SAfterMassSel"), gamma.mGamma(), gamma.mK0Short());
     histos.fill(HIST("GeneralQA/h2dMassLambdaVsK0SAfterMassSel"), lambda.mLambda(), lambda.mK0Short());
@@ -760,7 +1021,7 @@ struct sigma0builder {
                       fLambdaV0Type, LambdaBDTScore, AntiLambdaBDTScore);
   }
 
-  void processMonteCarlo(soa::Join<aod::StraCollisions, aod::StraCents, aod::StraEvSels, aod::StraStamps> const& collisions, V0DerivedMCDatas const& V0s, dauTracks const&, aod::MotherMCParts const&, soa::Join<aod::StraMCCollisions, aod::StraMCCollMults> const&, soa::Join<aod::V0MCCores, aod::V0MCCollRefs> const&)
+  void processMonteCarlo(soa::Join<aod::StraCollisions, aod::StraCents, aod::StraEvSels, aod::StraStamps, aod::StraCollLabels> const& collisions, V0DerivedMCDatas const& V0s, dauTracks const&, aod::MotherMCParts const&, soa::Join<aod::StraMCCollisions, aod::StraMCCollMults> const&, soa::Join<aod::V0MCCores, aod::V0MCCollRefs> const&)
   {
     for (const auto& coll : collisions) {
       if (!IsEventAccepted(coll, true)) {
@@ -771,6 +1032,7 @@ struct sigma0builder {
       auto V0Table_thisCollision = V0s.sliceBy(perCollisionMCDerived, collIdx);
 
       histos.fill(HIST("hEventCentrality"), coll.centFT0C());
+
       // V0 table sliced
       for (auto& gamma : V0Table_thisCollision) { // selecting photons from Sigma0
         float centrality = coll.centFT0C();
@@ -779,16 +1041,16 @@ struct sigma0builder {
           continue;
 
         auto gammaMC = gamma.v0MCCore_as<soa::Join<aod::V0MCCores, aod::V0MCCollRefs>>();
+        float V0MCpT = RecoDecay::pt(array{gammaMC.pxMC(), gammaMC.pyMC()});
 
         // Auxiliary histograms:
         if (gammaMC.pdgCode() == 22) {
           histos.fill(HIST("MC/h3dGammasXYZ"), gamma.x(), gamma.y(), gamma.z());
           float GammaY = TMath::Abs(RecoDecay::y(std::array{gamma.px(), gamma.py(), gamma.pz()}, o2::constants::physics::MassGamma));
-          float gammaMCpT = RecoDecay::pt(array{gammaMC.pxMC(), gammaMC.pyMC()});
           if (GammaY < 0.5) {                                                                                                                // rapidity selection
             histos.fill(HIST("MC/h2dPtVsCentrality_GammaBeforeSel"), centrality, gamma.pt());                                                // isgamma
-            if (gammaMCpT > 0)
-              histos.fill(HIST("MC/h2dGammaPtResolution"), 1.f / gammaMCpT, gamma.pt() - gammaMCpT); // pT resolution
+            if (V0MCpT > 0)
+              histos.fill(HIST("MC/h2dGammaPtResolution"), 1.f / V0MCpT, gamma.pt() - V0MCpT); // pT resolution
 
             if (gammaMC.pdgCodeMother() == 3212) {
               histos.fill(HIST("MC/h2dPtVsCentrality_GammaSigma0"), centrality, gamma.pt()); // isgamma from sigma
@@ -800,11 +1062,10 @@ struct sigma0builder {
         }
         if (gammaMC.pdgCode() == 3122) { // Is Lambda
           float LambdaY = TMath::Abs(RecoDecay::y(std::array{gamma.px(), gamma.py(), gamma.pz()}, o2::constants::physics::MassLambda));
-          float lambdaMCpT = RecoDecay::pt(array{gammaMC.pxMC(), gammaMC.pyMC()});
           if (LambdaY < 0.5) { // rapidity selection
             histos.fill(HIST("MC/h2dPtVsCentrality_LambdaBeforeSel"), centrality, gamma.pt());
-            if (lambdaMCpT > 0)
-              histos.fill(HIST("MC/h2dLambdaPtResolution"), 1.f / lambdaMCpT, gamma.pt() - lambdaMCpT); // pT resolution
+            if (V0MCpT > 0)
+              histos.fill(HIST("MC/h2dLambdaPtResolution"), 1.f / V0MCpT, gamma.pt() - V0MCpT); // pT resolution
             if (gammaMC.pdgCodeMother() == 3212) {
               histos.fill(HIST("MC/h2dPtVsCentrality_LambdaSigma0"), centrality, gamma.pt());
             }
@@ -859,10 +1120,14 @@ struct sigma0builder {
           int PhotonCandPDGCode = gammaMC.pdgCode();
           int PhotonCandPDGCodeMother = gammaMC.pdgCodeMother();
           float PhotonMCpT = RecoDecay::pt(array{gammaMC.pxMC(), gammaMC.pyMC()});
+          float PhotonPosMCpT = RecoDecay::pt(array{gammaMC.pxPosMC(), gammaMC.pyPosMC()});
+          float PhotonNegMCpT = RecoDecay::pt(array{gammaMC.pxNegMC(), gammaMC.pyNegMC()});
           bool fIsLambdaPrimary = lambdaMC.isPhysicalPrimary();
           int LambdaCandPDGCode = lambdaMC.pdgCode();
           int LambdaCandPDGCodeMother = lambdaMC.pdgCodeMother();
           float LambdaMCpT = RecoDecay::pt(array{lambdaMC.pxMC(), lambdaMC.pyMC()});
+          float LambdaPosMCpT = RecoDecay::pt(array{lambdaMC.pxPosMC(), lambdaMC.pyPosMC()});
+          float LambdaNegMCpT = RecoDecay::pt(array{lambdaMC.pxNegMC(), lambdaMC.pyNegMC()});
 
           if ((gammaMC.pdgCode() == 22) && (gammaMC.pdgCodeMother() == 3212) && (lambdaMC.pdgCode() == 3122) && (lambdaMC.pdgCodeMother() == 3212) && (gamma.motherMCPartId() == lambda.motherMCPartId())) {
             fIsSigma = true;
@@ -874,8 +1139,8 @@ struct sigma0builder {
             // TH3D Mass histogram
           }
           sigma0mccores(fIsSigma, fIsAntiSigma, SigmaMCpT,
-                        PhotonCandPDGCode, PhotonCandPDGCodeMother, fIsPhotonPrimary, PhotonMCpT,
-                        LambdaCandPDGCode, LambdaCandPDGCodeMother, fIsLambdaPrimary, LambdaMCpT);
+                        PhotonCandPDGCode, PhotonCandPDGCodeMother, fIsPhotonPrimary, PhotonMCpT, PhotonPosMCpT, PhotonNegMCpT,
+                        LambdaCandPDGCode, LambdaCandPDGCodeMother, fIsLambdaPrimary, LambdaMCpT, LambdaPosMCpT, LambdaNegMCpT);
 
           fillTables(lambda, gamma, coll); // filling tables with accepted candidates
 
@@ -939,8 +1204,208 @@ struct sigma0builder {
     }
   }
 
+  // Simulated processing in Run 3 (subscribes to MC information too)
+  void processGeneratedCollRun3(soa::Join<aod::StraMCCollisions, aod::StraMCCollMults>::iterator const& mcCollision)
+  {
+    histos.fill(HIST("Gen/hNEventsNch"), mcCollision.multMCNParticlesEta05());
+  }
+
+
+  void processV0sAssocQA(soa::Join<aod::StraCollisions, aod::StraCents, aod::StraEvSels, aod::StraStamps, aod::StraCollLabels> const& collisions, V0DerivedMCDatas const& fullMCV0s, dauTracks const&, aod::MotherMCParts const&, soa::Join<aod::StraMCCollisions, aod::StraMCCollMults> const& mcCollisions, soa::Join<aod::V0MCCores, aod::V0MCCollRefs> const&)
+  {
+    
+    analyseCollisionAssociation(mcCollisions, fullMCV0s, collisions);
+    
+  //   for (const auto& coll : collisions) {
+  //     if (!IsEventAccepted(coll, true)) {
+  //       continue;
+  //     }
+  //     // Do analysis with collision-grouped V0s, retain full collision information
+  //     const uint64_t collIdx = coll.globalIndex();
+  //     auto V0Table_thisCollision = V0s.sliceBy(perCollisionMCDerived, collIdx);
+
+  //     histos.fill(HIST("hEventCentrality"), coll.centFT0C());
+
+  //     // V0 table sliced
+  //     for (auto& gamma : V0Table_thisCollision) { // selecting photons from Sigma0
+  //       float centrality = coll.centFT0C();
+
+  //       if (!gamma.has_v0MCCore())
+  //         continue;
+
+  //       auto gammaMC = gamma.v0MCCore_as<soa::Join<aod::V0MCCores, aod::V0MCCollRefs>>();
+  //       float V0MCpT = RecoDecay::pt(array{gammaMC.pxMC(), gammaMC.pyMC()});
+
+  //       // check collision association explicitly
+        
+  //       bool correctCollision = false;
+  //       int mcNch = -1;
+  //       if (coll.has_straMCCollision()) {
+  //         double interactionRate = rateFetcher.fetch(ccdb.service, coll.timestamp(), coll.runNumber(), irSource) * 1.e-3;
+
+  //         histos.fill(HIST("GeneralQA/hInteractionRate"), interactionRate);
+  //         histos.fill(HIST("GeneralQA/hCentralityVsInteractionRate"), coll.centFT0C(), interactionRate);
+
+  //         auto mcCollision = coll.template straMCCollision_as<soa::Join<aod::StraMCCollisions, aod::StraMCCollMults>>();
+  //         mcNch = mcCollision.multMCNParticlesEta05();
+  //         correctCollision = (gammaMC.straMCCollisionId() == mcCollision.globalIndex());
+
+  //         if (gammaMC.pdgCode() == 22){
+  //           if (gamma.v0Type() == 7){
+  //             histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_GammaType7"), mcNch, interactionRate, V0MCpT);
+  //             if (!correctCollision)
+  //               histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_GammaType7_BadCollAssig"), mcNch, interactionRate, V0MCpT);
+  //           }
+  //           histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_Gamma"), mcNch, interactionRate, V0MCpT);
+  //           if (!correctCollision)
+  //             histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_Gamma_BadCollAssig"), mcNch, interactionRate, V0MCpT);              
+  //         }
+  //         if (gammaMC.pdgCode() == 3122){ // Is Lambda
+  //           if (gamma.v0Type() == 1){
+  //             histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_LambdaType1"), mcNch, interactionRate, V0MCpT);
+  //             if (!correctCollision)
+  //               histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_LambdaType1_BadCollAssig"), mcNch, interactionRate, V0MCpT);
+  //           }
+  //           histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_Lambda"), mcNch, interactionRate, V0MCpT);
+  //           if (!correctCollision)
+  //             histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_Lambda_BadCollAssig"), mcNch, interactionRate, V0MCpT);
+          
+  //         } 
+  //         if (gammaMC.pdgCode() == -3122){ // Is AntiLambda
+  //           histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_ALambda"), mcNch, interactionRate, V0MCpT);
+  //           if (!correctCollision)
+  //             histos.fill(HIST("V0MCQA/h3dNchVsIRPtVsPt_ALambda_BadCollAssig"), mcNch, interactionRate, V0MCpT);
+  //         } 
+  //       }
+  //     }
+  //   }
+  }
+
+  void processWithNeighbors(soa::Join<aod::StraCollisions, aod::StraCents, aod::StraEvSels, aod::StraStamps, aod::StraCollLabels> const& collisions, V0DerivedMCDatas const& V0s, dauTracks const&, aod::MotherMCParts const&, soa::Join<aod::StraMCCollisions, aod::StraMCCollMults> const&, soa::Join<aod::V0MCCores, aod::V0MCCollRefs> const&)
+  {
+    for (const auto& coll : collisions) {
+      if (!IsEventAccepted(coll, true)) {
+        continue;
+      }
+
+      //LOG(info) << "We passed 1st event sel";
+      const uint64_t collIdx = coll.globalIndex();
+      auto V0Table_thisCollision = V0s.sliceBy(perCollisionSTDDerived, collIdx);
+      //LOG(info) << "!! N v0s in the main coll: " << V0Table_thisCollision.size();
+
+      float centrality = coll.centFT0C();
+
+      for (auto& lambda : V0Table_thisCollision) {
+        if (lambda.v0Type() != 1) { // safeguard to avoid TPC-only photons
+          continue;
+        }
+        if (!lambda.has_v0MCCore())
+            continue;
+
+        //LOG(info) << "We passed lambda sel";
+        // Loop over neighboring stracollisions
+        for (int delta = -5; delta <= 5; ++delta) {
+          const uint64_t neighborCollIdx = collIdx + delta;
+          if ((neighborCollIdx<0) || (neighborCollIdx > (collisions.size()-1))) // safeguard to avoid invalid stracollisions
+            continue;
+          if (delta==0) LOG(info) << "<!!!!!Now we are on the main collision!!!!>, ind:" << collIdx;
+          else LOG(info) << "<Neighbor coll>, idx:" << neighborCollIdx << "Coll size: " << collisions.size();
+          auto neighborCollision = collisions.iteratorAt(neighborCollIdx);
+
+          //LOG(info) << "We passed neighbor coll creation";
+
+          if ((coll.timestamp() - neighborCollision.timestamp()) != 0) continue;
+
+          if (!IsEventAccepted(neighborCollision, false)) continue;
+
+          //LOG(info) << "We passed neighbor coll sel";
+
+          auto V0Table_neighborCollision = V0s.sliceBy(perCollisionSTDDerived, neighborCollIdx);
+
+          //LOG(info) << "N v0s in this coll: " << V0Table_neighborCollision.size();
+          for (auto& gamma : V0Table_neighborCollision) {
+            
+            if (gamma.v0Type() == 7 && gamma.mGamma() < 0.3) {
+              //LOG(info) << "We passed gamma sel!!";
+              if (!gamma.has_v0MCCore())
+                continue;
+              //LOG(info) << "We have MCCore!!";
+              if (!processSigmaCandidate(lambda, gamma)) continue;
+
+              auto gammaMC = gamma.v0MCCore_as<soa::Join<aod::V0MCCores, aod::V0MCCollRefs>>();
+              auto lambdaMC = lambda.v0MCCore_as<soa::Join<aod::V0MCCores, aod::V0MCCollRefs>>();
+
+              // Sigma0 candidate properties
+              // std::array<float, 3> pVecPhotons{gamma.px(), gamma.py(), gamma.pz()};
+              // std::array<float, 3> pVecLambda{lambda.px(), lambda.py(), lambda.pz()};
+              // auto arrMom = std::array{pVecPhotons, pVecLambda};
+              //float SigmaMass = RecoDecay::m(arrMom, std::array{o2::constants::physics::MassPhoton, o2::constants::physics::MassLambda0});
+              //float SigmapT = RecoDecay::pt(array{gamma.px() + lambda.px(), gamma.py() + lambda.py()});
+              //float SigmaY = TMath::Abs(RecoDecay::y(std::array{gamma.px() + lambda.px(), gamma.py() + lambda.py(), gamma.pz() + lambda.pz()}, o2::constants::physics::MassSigma0));
+
+              LOG(info) << "----------CALC PROPERTIES -----------";
+              bool fIsSigma = false;
+              bool fIsAntiSigma = false;
+              float SigmaMCpT = RecoDecay::pt(array{gammaMC.pxMC() + lambdaMC.pxMC(), gammaMC.pyMC() + lambdaMC.pyMC()});
+              bool fIsPhotonPrimary = gammaMC.isPhysicalPrimary();
+              int PhotonCandPDGCode = gammaMC.pdgCode();
+              int PhotonCandPDGCodeMother = gammaMC.pdgCodeMother();
+              float PhotonMCpT = RecoDecay::pt(array{gammaMC.pxMC(), gammaMC.pyMC()});
+              float PhotonPosMCpT = RecoDecay::pt(array{gammaMC.pxPosMC(), gammaMC.pyPosMC()});
+              float PhotonNegMCpT = RecoDecay::pt(array{gammaMC.pxNegMC(), gammaMC.pyNegMC()});
+              bool fIsLambdaPrimary = lambdaMC.isPhysicalPrimary();
+              int LambdaCandPDGCode = lambdaMC.pdgCode();
+              int LambdaCandPDGCodeMother = lambdaMC.pdgCodeMother();
+              float LambdaMCpT = RecoDecay::pt(array{lambdaMC.pxMC(), lambdaMC.pyMC()});
+              float LambdaPosMCpT = RecoDecay::pt(array{lambdaMC.pxPosMC(), lambdaMC.pyPosMC()});
+              float LambdaNegMCpT = RecoDecay::pt(array{lambdaMC.pxNegMC(), lambdaMC.pyNegMC()});
+
+              LOG(info) << "----------FILL HISTOS -----------";
+              if ((gammaMC.pdgCode() == 22) && (gammaMC.pdgCodeMother() == 3212) && (lambdaMC.pdgCode() == 3122) && (lambdaMC.pdgCodeMother() == 3212) && (gamma.motherMCPartId() == lambda.motherMCPartId())) {
+                fIsSigma = true;
+                histos.fill(HIST("MC/h2dPtVsCentrality_Sigma0AfterSel"), centrality, RecoDecay::pt(array{gamma.px() + lambda.px(), gamma.py() + lambda.py()}));
+              }
+              if ((gammaMC.pdgCode() == 22) && (gammaMC.pdgCodeMother() == -3212) && (lambdaMC.pdgCode() == -3122) && (lambdaMC.pdgCodeMother() == -3212) && (gamma.motherMCPartId() == lambda.motherMCPartId())) {
+                fIsAntiSigma = true;
+                histos.fill(HIST("MC/h2dPtVsCentrality_AntiSigma0AfterSel"), centrality, RecoDecay::pt(array{gamma.px() + lambda.px(), gamma.py() + lambda.py()}));
+                // TH3D Mass histogram
+              }
+
+              if (fIsSigma || fIsAntiSigma) LOG(info) << "Ok, we have a sigma! GOOOOD!";
+
+              LOG(info) << "----------FILLING MC TABLES PLEASE-----------";
+
+              sigma0mccores(fIsSigma, fIsAntiSigma, SigmaMCpT,
+                            PhotonCandPDGCode, PhotonCandPDGCodeMother, fIsPhotonPrimary, PhotonMCpT, PhotonPosMCpT, PhotonNegMCpT,
+                            LambdaCandPDGCode, LambdaCandPDGCodeMother, fIsLambdaPrimary, LambdaMCpT, LambdaPosMCpT, LambdaNegMCpT);
+
+              LOG(info) << "----------FILLING NORMAL TABLES PLEASE-----------";
+              fillTables(lambda, gamma, coll); // filling tables with accepted candidates
+
+              nSigmaCandidates++;
+              if (nSigmaCandidates % 5000 == 0) {
+                LOG(info) << "Sigma0 Candidates built: " << nSigmaCandidates;
+              }
+
+              // QA histograms
+              // Signal only (sigma0+antisigma0)
+              // if (fIsSigma || fIsAntiSigma)
+              //   histos.fill(HIST("MC/h2dPtVsMassSigma_SignalOnly"), SigmapT, SigmaMass);
+
+              // histos.fill(HIST("h3dMassSigmasAfterSel"), coll.centFT0C(), RecoDecay::pt(array{gamma.px() + lambda.px(), gamma.py() + lambda.py()}), RecoDecay::m(array{gamma.px(), gamma.py(), gamma.pz(), lambda.px(), lambda.py(), lambda.pz()}, array{o2::constants::physics::MassPhoton, o2::constants::physics::MassLambda0}));
+              
+            }
+          }
+        }
+      }
+    }
+  }
+
   PROCESS_SWITCH(sigma0builder, processMonteCarlo, "process as if MC data", false);
   PROCESS_SWITCH(sigma0builder, processRealData, "process as if real data", true);
+  PROCESS_SWITCH(sigma0builder, processGeneratedCollRun3, "process MC generated Run 3", false);
+  PROCESS_SWITCH(sigma0builder, processV0sAssocQA, "process MC generated Run 3", false);
+  PROCESS_SWITCH(sigma0builder, processWithNeighbors, "process with neighboring stracollisions", false);
 };
 
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)

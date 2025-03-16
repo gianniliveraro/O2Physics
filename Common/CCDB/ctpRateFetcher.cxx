@@ -44,7 +44,8 @@ double ctpRateFetcher::fetch(o2::ccdb::BasicCCDBManager* ccdb, uint64_t timeStam
         LOG(info) << "Trying different class";
         ret = fetchCTPratesClasses(ccdb, timeStamp, runNumber, "CMTVX-NONE");
         if (ret < 0) {
-          LOG(fatal) << "None of the classes used for lumi found";
+          //LOG(fatal) << "None of the classes used for lumi found";
+          LOG(info) << "None of the classes used for lumi found. Returning a negative IR!";
         }
       }
       return ret;
