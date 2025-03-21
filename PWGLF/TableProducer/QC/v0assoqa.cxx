@@ -63,9 +63,11 @@ using LabeledTracksExtra = soa::Join<aod::TracksExtra, aod::McTrackLabels>;
 
 struct v0assoqa {
 
-  Preslice<aod::V0s> perCollision = o2::aod::v0::CollisionId;
+  Preslice<aod::V0s> perCollision = o2::aod::v0::collisionId;
+
+  HistogramRegistry histos{"Histos", {}, OutputObjHandlingPolicy::AnalysisObject};
   
-  void init(InitContext& context)
+  void init(InitContext&)
   {
     auto hCollAssocQA = histos.add<TH2>("hCollAssocQA", "hCollAssocQA", kTH2D, {{6, -0.5f, 5.5f}, {2, -0.5f, 1.5f}});
     hCollAssocQA->GetXaxis()->SetBinLabel(1, "K0");
@@ -144,13 +146,13 @@ struct v0assoqa {
           auto lMCNegTrack = lNegTrack.template mcParticle_as<aod::McParticles>();
           auto lMCPosTrack = lPosTrack.template mcParticle_as<aod::McParticles>();  
                
-          photonid = FindCommonMotherFrom2Prongs(lMCPosTrack, lMCNegTrack, -11, 11, 22, particlesMC);
+          int photonid = FindCommonMotherFrom2Prongs(lMCPosTrack, lMCNegTrack, -11, 11, 22, particlesMC);
 
           if (photonid>0){
             auto mcphoton = particlesMC.iteratorAt(photonid);
             //auto lNegMother = lMCNegTrack.template mothers_as<aod::McParticles>()
 
-            correctMcCollisionIndex = mcphoton.mcCollisionId();
+            int correctMcCollisionIndex = mcphoton.mcCollisionId();
             mcpt = mcphoton.pt();   
 
             bool collisionAssociationOK = false;
