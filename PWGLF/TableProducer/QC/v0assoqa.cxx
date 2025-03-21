@@ -52,38 +52,19 @@
 #include "CCDB/BasicCCDBManager.h"
 #include "DataFormatsCalibration/MeanVertexObject.h"
 #include "TableHelper.h"
-#include "Tools/ML/MlResponse.h"
-#include "Tools/ML/model.h"
 
 using namespace o2;
 using namespace o2::framework;
 using namespace o2::framework::expressions;
 using std::array;
 
-// simple checkers
-#define bitset(var, nbit) ((var) |= (1 << (nbit)))
-#define bitcheck(var, nbit) ((var) & (1 << (nbit)))
-
-// use parameters + cov mat non-propagated, aux info + (extension propagated)
-using FullTracksExt = soa::Join<aod::Tracks, aod::TracksExtra, aod::TracksCov>;
-using FullTracksExtIU = soa::Join<aod::TracksIU, aod::TracksExtra, aod::TracksCovIU>;
-using TracksWithExtra = soa::Join<aod::Tracks, aod::TracksExtra>;
-
-// For dE/dx association in pre-selection
-using TracksExtraWithPID = soa::Join<aod::TracksExtra, aod::pidTPCFullEl, aod::pidTPCFullPi, aod::pidTPCFullPr, aod::pidTPCFullHe>;
-
-// For MC and dE/dx association
-using TracksExtraWithPIDandLabels = soa::Join<aod::TracksExtra, aod::pidTPCFullEl, aod::pidTPCFullPi, aod::pidTPCFullPr, aod::pidTPCFullHe, aod::McTrackLabels>;
-
-// Pre-selected V0s
-using TaggedV0s = soa::Join<aod::V0s, aod::V0Tags>;
-using TaggedFindableV0s = soa::Join<aod::FindableV0s, aod::V0Tags>;
-
 // For MC association in pre-selection
 using LabeledTracksExtra = soa::Join<aod::TracksExtra, aod::McTrackLabels>;
 
-struct lambdakzeroBuilder {
+struct v0assoqa {
 
+  Preslice<aod::V0s> perCollision = o2::aod::v0::CollisionId;
+  
   void init(InitContext& context)
   {
     auto hCollAssocQA = histos.add<TH2>("hCollAssocQA", "hCollAssocQA", kTH2D, {{6, -0.5f, 5.5f}, {2, -0.5f, 1.5f}});
@@ -147,93 +128,40 @@ struct lambdakzeroBuilder {
     return motherid1;
   }
 
-  //*+-+*+-+*+-+*+-+*+-+*+-+*+-+*+-+*+-+*+-+*
-  /// function to check PDG association
-  template <class TTrackTo, typename TV0Object, typename TMCParticles>
-  void checkPDG(TV0Object const& lV0Candidate, uint32_t& maskElement, int mcCollisionId, TMCParticles mcparticles)
+  void processBuildMCAssociated(soa::Join<aod::Collisions, aod::McCollisionLabels> const& collisions, aod::V0s const& v0table, LabeledTracksExtra const&, aod::McParticles const& particlesMC)
   {
-    int lPDG = -1;
-    int correctMcCollisionIndex = -1;
-    int photonid = -1;
-    float mcpt = -1.0;
-    bool physicalPrimary = false;
-    auto lNegTrack = lV0Candidate.template negTrack_as<TTrackTo>();
-    auto lPosTrack = lV0Candidate.template posTrack_as<TTrackTo>();
 
-    // Association check
-    // There might be smarter ways of doing this in the future
-    if (lNegTrack.has_mcParticle() && lPosTrack.has_mcParticle()) {
-      auto lMCNegTrack = lNegTrack.template mcParticle_as<aod::McParticles>();
-      auto lMCPosTrack = lPosTrack.template mcParticle_as<aod::McParticles>();
-      // Test for photons!
-      photonid = FindCommonMotherFrom2Prongs(lMCPosTrack, lMCNegTrack, -11, 11, 22, mcparticles);
-      if (lMCNegTrack.has_mothers() && lMCPosTrack.has_mothers()) {
-        
-        for (auto& lNegMother : lMCNegTrack.template mothers_as<aod::McParticles>()) {
-          for (auto& lPosMother : lMCPosTrack.template mothers_as<aod::McParticles>()) {
-            if (lNegMother.globalIndex() == lPosMother.globalIndex() && (!dIfMCselectPhysicalPrimary || lNegMother.isPhysicalPrimary())) {
-              lPDG = lNegMother.pdgCode();
-              correctMcCollisionIndex = lNegMother.mcCollisionId();
-              physicalPrimary = lNegMother.isPhysicalPrimary();
-              mcpt = lNegMother.pt();
+    for (auto& collision : collisions) {
+      auto V0s = v0table.sliceBy(perCollision, collision.globalIndex());
 
-              // additionally check PDG of the mother particle if requested
-              if (dIfMCselectV0MotherPDG != 0) {
-                lPDG = 0; // this is not the species you're looking for
-                if (lNegMother.has_mothers()) {
-                  for (auto& lNegGrandMother : lNegMother.template mothers_as<aod::McParticles>()) {
-                    if (lNegGrandMother.pdgCode() == dIfMCselectV0MotherPDG)
-                      lPDG = lNegMother.pdgCode();
-                  }
-                }
-              }
-              // end extra PDG of mother check
+      for (auto const& v0 : V0s) {
+
+        auto lNegTrack = v0.template negTrack_as<LabeledTracksExtra>();
+        auto lPosTrack = v0.template posTrack_as<LabeledTracksExtra>();
+        float mcpt = -1.0;
+
+        if (lNegTrack.has_mcParticle() && lPosTrack.has_mcParticle()) {
+          auto lMCNegTrack = lNegTrack.template mcParticle_as<aod::McParticles>();
+          auto lMCPosTrack = lPosTrack.template mcParticle_as<aod::McParticles>();  
+               
+          photonid = FindCommonMotherFrom2Prongs(lMCPosTrack, lMCNegTrack, -11, 11, 22, particlesMC);
+
+          if (photonid>0){
+            auto mcphoton = particlesMC.iteratorAt(photonid);
+            //auto lNegMother = lMCNegTrack.template mothers_as<aod::McParticles>()
+
+            correctMcCollisionIndex = mcphoton.mcCollisionId();
+            mcpt = mcphoton.pt();   
+
+            bool collisionAssociationOK = false;
+            if (correctMcCollisionIndex > -1 && correctMcCollisionIndex == collision.mcCollisionId()) {
+              collisionAssociationOK = true;
             }
+            histos.fill(HIST("hCollAssocQA"), 3.0f, collisionAssociationOK);
+            histos.fill(HIST("h2dPtVsCollAssocGamma"), mcpt, collisionAssociationOK);
           }
         }
       }
-      
-    } // end association check
-
-    bool collisionAssociationOK = false;
-    if (correctMcCollisionIndex > -1 && correctMcCollisionIndex == mcCollisionId) {
-      collisionAssociationOK = true;
-    }
-
-    if (lPDG == 310) {
-      if (qaCollisionAssociation) {
-        histos.fill(HIST("hCollAssocQA"), 0.0f, collisionAssociationOK);
-        histos.fill(HIST("h2dPtVsCollAssocK0Short"), mcpt, collisionAssociationOK);
-      }
-    }
-    if (lPDG == 3122) {
-      if (qaCollisionAssociation) {
-        histos.fill(HIST("hCollAssocQA"), 1.0f, collisionAssociationOK);
-        histos.fill(HIST("h2dPtVsCollAssocLambda"), mcpt, collisionAssociationOK);
-      }
-    }
-    if (lPDG == -3122) {
-      if (qaCollisionAssociation) {
-        histos.fill(HIST("hCollAssocQA"), 2.0f, collisionAssociationOK);
-        histos.fill(HIST("h2dPtVsCollAssocAntiLambda"), mcpt, collisionAssociationOK);
-      }
-    }
-
-    //if (lPDG == 22) { // Small mod to check photon assoc
-    if (photonid > 0) { // Small mod to check photon assoc
-      if (qaCollisionAssociation) {
-        histos.fill(HIST("hCollAssocQA"), 3.0f, collisionAssociationOK);
-        histos.fill(HIST("h2dPtVsCollAssocGamma"), mcpt, collisionAssociationOK);
-      }
-    }
-  }
-
-  void processBuildMCAssociated(soa::Join<aod::Collisions, aod::McCollisionLabels> const& /*collisions*/, aod::V0s const& v0table, LabeledTracksExtra const&, aod::McParticles const& particlesMC)
-  {
-    for (auto const& v0 : v0table) {
-      auto collision = v0.collision_as<soa::Join<aod::Collisions, aod::McCollisionLabels>>();
-      checkPDG<LabeledTracksExtra>(v0, selectionMask[v0.globalIndex()], collision.mcCollisionId(), particlesMC);
-      checkTrackQuality<LabeledTracksExtra>(v0, selectionMask[v0.globalIndex()], true);
     }
   }
   PROCESS_SWITCH(v0assoqa, processBuildMCAssociated, "Process Run 3 data", true);
