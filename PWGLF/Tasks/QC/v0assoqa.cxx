@@ -36,12 +36,12 @@
 #include "Framework/AnalysisTask.h"
 #include "Framework/AnalysisDataModel.h"
 #include "Framework/ASoAHelpers.h"
+#include "Framework/ASoA.h"
 #include "DCAFitter/DCAFitterN.h"
 #include "ReconstructionDataFormats/Track.h"
 #include "Common/Core/RecoDecay.h"
 #include "Common/Core/trackUtilities.h"
 #include "PWGLF/DataModel/LFStrangenessTables.h"
-#include "PWGLF/DataModel/LFStrangenessMLTables.h"
 #include "PWGLF/DataModel/LFParticleIdentification.h"
 #include "Common/Core/TrackSelection.h"
 #include "Common/DataModel/TrackSelectionTables.h"
@@ -52,6 +52,10 @@
 #include "CCDB/BasicCCDBManager.h"
 #include "DataFormatsCalibration/MeanVertexObject.h"
 #include "TableHelper.h"
+#include "Common/DataModel/EventSelection.h"
+#include "Common/DataModel/Centrality.h"
+#include "Common/DataModel/PIDResponse.h"
+#include "Common/DataModel/Multiplicity.h"
 
 using namespace o2;
 using namespace o2::framework;
@@ -71,11 +75,13 @@ struct v0assoqa {
   Configurable<int> PDGCodeNegDau{"PDGCodeNegDau", 11, "select PDG code of negative daughter track"};
   Configurable<int> PDGCodeMother{"PDGCodeMother", 22, "select PDG code of mother particle"};
 
-  void init(InitContext&)
+  void init(InitContext const&)
   {
-    auto h2dPtVsCollAssoc = histos.add<TH2>("h2dPtVsCollAssoc", "h2dPtVsCollAssoc", kTH2D, {{100, 0.0f, 10.0f}, {2, -0.5f, 1.5f}});
-    h2dPtVsCollAssoc->GetYaxis()->SetBinLabel(1, "Wrong collision");
-    h2dPtVsCollAssoc->GetYaxis()->SetBinLabel(2, "Correct collision");
+    histos.add("h2dPtVsCollAssoc", "h2dPtVsCollAssoc", kTH2D, {{100, 0.0f, 10.0f}, {2, -0.5f, 1.5f}});
+    histos.get<TH2>(HIST("h2dPtVsCollAssoc"))->GetYaxis()->SetBinLabel(1, "Wrong collision");
+    histos.get<TH2>(HIST("h2dPtVsCollAssoc"))->GetYaxis()->SetBinLabel(2, "Correct collision");
+
+    histos.add("hNRecoV0s", "hNRecoV0s", kTH1D, {{50, -0.5, 49.5f}});
   }
 
   //_______________________________________________________________________
@@ -118,10 +124,10 @@ struct v0assoqa {
 
   void processBuildMCAssociated(soa::Join<aod::Collisions, aod::McCollisionLabels> const& collisions, aod::V0s const& v0table, LabeledTracksExtra const&, aod::McParticles const& particlesMC)
   {
-
+    std::map<int, int> mcV0Counts;
     for (auto& collision : collisions) {
       auto V0s = v0table.sliceBy(perCollision, collision.globalIndex());
-
+      
       for (auto const& v0 : V0s) {
 
         auto lNegTrack = v0.template negTrack_as<LabeledTracksExtra>();
@@ -136,6 +142,7 @@ struct v0assoqa {
 
           if (v0id>0){
             auto mcv0 = particlesMC.iteratorAt(v0id);
+            mcV0Counts[v0id]++;
             
             int correctMcCollisionIndex = mcv0.mcCollisionId();
             mcpt = mcv0.pt();   
@@ -148,10 +155,16 @@ struct v0assoqa {
           }
         }
       }
+
+      for (const auto& [v0id, count] : mcV0Counts) {
+        histos.fill(HIST("hNRecoV0s"), count);
+      }
     }
   }
-  PROCESS_SWITCH(v0assoqa, processBuildMCAssociated, "Process Run 3 data", true);
+
+  PROCESS_SWITCH(v0assoqa, processBuildMCAssociated, "Check wrong v0-to-collision association", true);
 };
+
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
 {
   return WorkflowSpec{adaptAnalysisTask<v0assoqa>(cfgc)};
