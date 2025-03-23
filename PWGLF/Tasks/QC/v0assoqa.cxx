@@ -81,6 +81,7 @@ struct v0assoqa {
     histos.get<TH2>(HIST("h2dPtVsCollAssoc"))->GetYaxis()->SetBinLabel(1, "Wrong collision");
     histos.get<TH2>(HIST("h2dPtVsCollAssoc"))->GetYaxis()->SetBinLabel(2, "Correct collision");
 
+    histos.add("hNRecoV0sPerColl", "hNRecoV0sPerColl", kTH1D, {{50, -0.5, 49.5f}});
     histos.add("hNRecoV0s", "hNRecoV0s", kTH1D, {{50, -0.5, 49.5f}});
 
     // Add new histogram for mcpt of particleMC
@@ -127,9 +128,10 @@ struct v0assoqa {
 
   void processBuildMCAssociated(soa::Join<aod::Collisions, aod::McCollisionLabels> const& collisions, aod::V0s const& v0table, LabeledTracksExtra const&, aod::McParticles const& particlesMC)
   {
-    std::map<int, int> mcV0Counts;
-    std::set<int> filledMcPt; // Set to keep track of filled particleMC ids
+    std::unordered_map<int, int> mcV0Counts;
+    std::unordered_set<int> filledMcPt; // Set to keep track of filled particleMC ids
     for (auto& collision : collisions) {
+      std::unordered_map<int, int> mcV0CountsPerColl;
       auto V0s = v0table.sliceBy(perCollision, collision.globalIndex());
       
       for (auto const& v0 : V0s) {
@@ -138,37 +140,44 @@ struct v0assoqa {
         auto lPosTrack = v0.template posTrack_as<LabeledTracksExtra>();
         float mcpt = -1.0;
 
-        if (lNegTrack.has_mcParticle() && lPosTrack.has_mcParticle()) {
-          auto lMCNegTrack = lNegTrack.template mcParticle_as<aod::McParticles>();
-          auto lMCPosTrack = lPosTrack.template mcParticle_as<aod::McParticles>();  
-               
-          int v0id = FindCommonMotherFrom2Prongs(lMCPosTrack, lMCNegTrack, PDGCodePosDau, PDGCodeNegDau, PDGCodeMother, particlesMC);
-
-          if (v0id > 0) {
-            auto mcv0 = particlesMC.iteratorAt(v0id);
-            mcV0Counts[v0id]++;
-            
-            int correctMcCollisionIndex = mcv0.mcCollisionId();
-            mcpt = mcv0.pt();
-
-            // Fill only if this particleMC has not been filled before
-            if (filledMcPt.find(v0id) == filledMcPt.end()) {
-              histos.fill(HIST("hMcPtParticleMC"), mcpt);
-              filledMcPt.insert(v0id);
-            }
-
-            bool collisionAssociationOK = false;
-            if (correctMcCollisionIndex > -1 && correctMcCollisionIndex == collision.mcCollisionId()) {
-              collisionAssociationOK = true;
-            }
-            histos.fill(HIST("h2dPtVsCollAssoc"), mcpt, collisionAssociationOK);
-          }
+        if (!lNegTrack.has_mcParticle() || !lPosTrack.has_mcParticle()) {
+          continue;
         }
+
+        auto lMCNegTrack = lNegTrack.template mcParticle_as<aod::McParticles>();
+        auto lMCPosTrack = lPosTrack.template mcParticle_as<aod::McParticles>();  
+              
+        int v0id = FindCommonMotherFrom2Prongs(lMCPosTrack, lMCNegTrack, PDGCodePosDau, PDGCodeNegDau, PDGCodeMother, particlesMC);
+
+        if (v0id <= 0) {
+          continue;
+        }
+
+        auto mcv0 = particlesMC.iteratorAt(v0id);
+        mcV0Counts[v0id]++;
+        mcV0CountsPerColl[v0id]++;
+        
+        int correctMcCollisionIndex = mcv0.mcCollisionId();
+        mcpt = mcv0.pt();
+
+        // Fill only if this particleMC has not been filled before
+        if (filledMcPt.insert(v0id).second) {
+          histos.fill(HIST("hMcPtParticleMC"), mcpt);
+        }
+
+        bool collisionAssociationOK = false;
+        if (correctMcCollisionIndex > -1 && correctMcCollisionIndex == collision.mcCollisionId()) {
+          collisionAssociationOK = true;
+        }
+        histos.fill(HIST("h2dPtVsCollAssoc"), mcpt, collisionAssociationOK); 
       }
 
-      for (const auto& [v0id, count] : mcV0Counts) {
-        histos.fill(HIST("hNRecoV0s"), count);
+      for (const auto& [v0id, count] : mcV0CountsPerColl) {
+        histos.fill(HIST("hNRecoV0sPerColl"), count);
       }
+    }
+    for (const auto& [v0id, count] : mcV0Counts) {
+      histos.fill(HIST("hNRecoV0s"), count);
     }
   }
 
