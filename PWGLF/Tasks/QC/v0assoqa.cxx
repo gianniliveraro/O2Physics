@@ -67,29 +67,15 @@ struct v0assoqa {
 
   HistogramRegistry histos{"Histos", {}, OutputObjHandlingPolicy::AnalysisObject};
   
+  Configurable<int> PDGCodePosDau{"PDGCodePosDau", -11, "select PDG code of positive daughter track"};
+  Configurable<int> PDGCodeNegDau{"PDGCodeNegDau", 11, "select PDG code of negative daughter track"};
+  Configurable<int> PDGCodeMother{"PDGCodeMother", 22, "select PDG code of mother particle"};
+
   void init(InitContext&)
   {
-    auto hCollAssocQA = histos.add<TH2>("hCollAssocQA", "hCollAssocQA", kTH2D, {{6, -0.5f, 5.5f}, {2, -0.5f, 1.5f}});
-    hCollAssocQA->GetXaxis()->SetBinLabel(1, "K0");
-    hCollAssocQA->GetXaxis()->SetBinLabel(2, "Lambda");
-    hCollAssocQA->GetXaxis()->SetBinLabel(3, "AntiLambda");
-    hCollAssocQA->GetXaxis()->SetBinLabel(4, "Gamma");
-    hCollAssocQA->GetYaxis()->SetBinLabel(1, "Wrong collision");
-    hCollAssocQA->GetYaxis()->SetBinLabel(2, "Correct collision");
-
-    auto h2dPtVsCollAssocK0Short = histos.add<TH2>("h2dPtVsCollAssocK0Short", "h2dPtVsCollAssocK0Short", kTH2D, {{100, 0.0f, 10.0f}, {2, -0.5f, 1.5f}});
-    auto h2dPtVsCollAssocLambda = histos.add<TH2>("h2dPtVsCollAssocLambda", "h2dPtVsCollAssocLambda", kTH2D, {{100, 0.0f, 10.0f}, {2, -0.5f, 1.5f}});
-    auto h2dPtVsCollAssocAntiLambda = histos.add<TH2>("h2dPtVsCollAssocAntiLambda", "h2dPtVsCollAssocAntiLambda", kTH2D, {{100, 0.0f, 10.0f}, {2, -0.5f, 1.5f}});
-    auto h2dPtVsCollAssocGamma = histos.add<TH2>("h2dPtVsCollAssocGamma", "h2dPtVsCollAssocGamma", kTH2D, {{100, 0.0f, 10.0f}, {2, -0.5f, 1.5f}});
-
-    h2dPtVsCollAssocK0Short->GetYaxis()->SetBinLabel(1, "Wrong collision");
-    h2dPtVsCollAssocK0Short->GetYaxis()->SetBinLabel(2, "Correct collision");
-    h2dPtVsCollAssocLambda->GetYaxis()->SetBinLabel(1, "Wrong collision");
-    h2dPtVsCollAssocLambda->GetYaxis()->SetBinLabel(2, "Correct collision");
-    h2dPtVsCollAssocAntiLambda->GetYaxis()->SetBinLabel(1, "Wrong collision");
-    h2dPtVsCollAssocAntiLambda->GetYaxis()->SetBinLabel(2, "Correct collision");
-    h2dPtVsCollAssocGamma->GetYaxis()->SetBinLabel(1, "Wrong collision");
-    h2dPtVsCollAssocGamma->GetYaxis()->SetBinLabel(2, "Correct collision");
+    auto h2dPtVsCollAssoc = histos.add<TH2>("h2dPtVsCollAssoc", "h2dPtVsCollAssoc", kTH2D, {{100, 0.0f, 10.0f}, {2, -0.5f, 1.5f}});
+    h2dPtVsCollAssoc->GetYaxis()->SetBinLabel(1, "Wrong collision");
+    h2dPtVsCollAssoc->GetYaxis()->SetBinLabel(2, "Correct collision");
   }
 
   //_______________________________________________________________________
@@ -146,21 +132,19 @@ struct v0assoqa {
           auto lMCNegTrack = lNegTrack.template mcParticle_as<aod::McParticles>();
           auto lMCPosTrack = lPosTrack.template mcParticle_as<aod::McParticles>();  
                
-          int photonid = FindCommonMotherFrom2Prongs(lMCPosTrack, lMCNegTrack, -11, 11, 22, particlesMC);
+          int v0id = FindCommonMotherFrom2Prongs(lMCPosTrack, lMCNegTrack, PDGCodePosDau, PDGCodeNegDau, PDGCodeMother, particlesMC);
 
-          if (photonid>0){
-            auto mcphoton = particlesMC.iteratorAt(photonid);
-            //auto lNegMother = lMCNegTrack.template mothers_as<aod::McParticles>()
-
-            int correctMcCollisionIndex = mcphoton.mcCollisionId();
-            mcpt = mcphoton.pt();   
+          if (v0id>0){
+            auto mcv0 = particlesMC.iteratorAt(v0id);
+            
+            int correctMcCollisionIndex = mcv0.mcCollisionId();
+            mcpt = mcv0.pt();   
 
             bool collisionAssociationOK = false;
             if (correctMcCollisionIndex > -1 && correctMcCollisionIndex == collision.mcCollisionId()) {
               collisionAssociationOK = true;
             }
-            histos.fill(HIST("hCollAssocQA"), 3.0f, collisionAssociationOK);
-            histos.fill(HIST("h2dPtVsCollAssocGamma"), mcpt, collisionAssociationOK);
+            histos.fill(HIST("h2dPtVsCollAssoc"), mcpt, collisionAssociationOK);
           }
         }
       }

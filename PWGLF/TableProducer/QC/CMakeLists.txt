@@ -19,7 +19,3 @@ o2physics_add_dpl_workflow(flow-qc
     PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore
     COMPONENT_NAME Analysis)
 
-o2physics_add_dpl_workflow(v0asso-qa
-    SOURCES v0assoqa.cxx
-    PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore
-    COMPONENT_NAME Analysis)
