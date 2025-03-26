@@ -137,5 +137,5 @@ o2physics_add_dpl_workflow(its-tpc-matching-vzeros
 
 o2physics_add_dpl_workflow(v0asso-qa
     SOURCES v0assoqa.cxx
-    PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore
+    PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore O2Physics::AnalysisCCDB
     COMPONENT_NAME Analysis)
