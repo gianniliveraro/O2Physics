@@ -846,7 +846,7 @@ struct StrangenessBuilder {
             } // end build V0
           } // end candidate loop
 
-          // mark de-duplicated candidates
+          // mark de-duplicated candidates          
           for (size_t ic = 0; ic < v0tableGrouped[iV0].collisionIds.size(); ic++) {
             ao2dV0toV0List[v0tableGrouped[iV0].V0Ids[ic]] = -2;
             // algorithm 1: best pointing angle
@@ -1020,9 +1020,11 @@ struct StrangenessBuilder {
         // simple passthrough: copy existing cascades to build list
         for (const auto& cascade : cascades) {
           auto const& v0 = cascade.v0();
+          int v0Idx = ao2dV0toV0List[v0.globalIndex()];
+          if (v0Idx < 0) continue; // skip cascades whose V0s were deduplicated away
           currentCascadeEntry.globalId = cascade.globalIndex();
           currentCascadeEntry.collisionId = cascade.collisionId();
-          currentCascadeEntry.v0Id = ao2dV0toV0List[v0.globalIndex()];
+          currentCascadeEntry.v0Id = v0Idx;
           currentCascadeEntry.posTrackId = v0.posTrackId();
           currentCascadeEntry.negTrackId = v0.negTrackId();
           currentCascadeEntry.bachTrackId = cascade.bachelorId();
