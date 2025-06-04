@@ -256,6 +256,7 @@ struct sigma0builder {
     histos.add("PhotonSel/hPhotonDCAPosToPV", "hPhotonDCAPosToPV", kTH1F, {axisDCAtoPV});
     histos.add("PhotonSel/hPhotonDCADau", "hPhotonDCADau", kTH1F, {axisDCAdau});
     histos.add("PhotonSel/hPhotonRadius", "hPhotonRadius", kTH1F, {axisRadius});
+    histos.add("PhotonSel/hPhotonpT", "hPhotonpT", kTH1F, {axisPt});
 
     histos.add("LambdaSel/hSelectionStatistics", "hSelectionStatistics", kTH1D, {axisCandSel});
     histos.get<TH1>(HIST("LambdaSel/hSelectionStatistics"))->GetXaxis()->SetBinLabel(1, "No Sel");
@@ -274,6 +275,7 @@ struct sigma0builder {
     histos.add("LambdaSel/hLambdaDCAPosToPV", "hLambdaDCAPosToPV", kTH1F, {axisDCAtoPV});
     histos.add("LambdaSel/hLambdaDCADau", "hLambdaDCADau", kTH1F, {axisDCAdau});
     histos.add("LambdaSel/hLambdaRadius", "hLambdaRadius", kTH1F, {axisRadius});
+    histos.add("LambdaSel/hLambdapT", "hLambdapT", kTH1F, {axisPt});
 
     histos.add("SigmaSel/hSelectionStatistics", "hSelectionStatistics", kTH1D, {axisCandSel});
     histos.get<TH1>(HIST("SigmaSel/hSelectionStatistics"))->GetXaxis()->SetBinLabel(1, "No Sel");
@@ -307,15 +309,22 @@ struct sigma0builder {
     }
 
     if (doAssocStudy && doprocessMonteCarlo) {
+      histos.add("V0AssoQA/hGammaCand_pT", "hGammaCand_pT", kTH1F, {axisPt});
+      histos.add("V0AssoQA/hLambdaCand_pT", "hLambdaCand_pT", kTH1F, {axisPt});
+
       histos.add("V0AssoQA/h2dIRVsPt_TrueGamma", "h2dIRVsPt_TrueGamma", kTH2F, {axisIRBinning, axisPt});
       histos.add("V0AssoQA/h3dPAVsIRVsPt_TrueGamma", "h3dPAVsIRVsPt_TrueGamma", kTH3F, {axisPA, axisIRBinning, axisPt});
+      histos.add("V0AssoQA/h3dDCADauVsIRVsPt_TrueGamma", "h3dDCADauVsIRVsPt_TrueGamma", kTH3F, {axisDCAdau, axisIRBinning, axisPt});
       histos.add("V0AssoQA/h2dIRVsPt_TrueGamma_BadCollAssig", "h2dIRVsPt_TrueGamma_BadCollAssig", kTH2F, {axisIRBinning, axisPt});
       histos.add("V0AssoQA/h3dPAVsIRVsPt_TrueGamma_BadCollAssig", "h3dPAVsIRVsPt_TrueGamma_BadCollAssig", kTH3F, {axisPA, axisIRBinning, axisPt});
+      histos.add("V0AssoQA/h3dDCADauVsIRVsPt_TrueGamma_BadCollAssig", "h3dDCADauVsIRVsPt_TrueGamma_BadCollAssig", kTH3F, {axisDCAdau, axisIRBinning, axisPt});
 
       histos.add("V0AssoQA/h2dIRVsPt_TrueLambda", "h2dIRVsPt_TrueLambda", kTH2F, {axisIRBinning, axisPt});
       histos.add("V0AssoQA/h3dPAVsIRVsPt_TrueLambda", "h3dPAVsIRVsPt_TrueLambda", kTH3F, {axisPA, axisIRBinning, axisPt});
+      histos.add("V0AssoQA/h3dDCADauVsIRVsPt_TrueLambda", "h3dDCADauVsIRVsPt_TrueLambda", kTH3F, {axisDCAdau, axisIRBinning, axisPt});
       histos.add("V0AssoQA/h2dIRVsPt_TrueLambda_BadCollAssig", "h2dIRVsPt_TrueLambda_BadCollAssig", kTH2F, {axisIRBinning, axisPt});
       histos.add("V0AssoQA/h3dPAVsIRVsPt_TrueLambda_BadCollAssig", "h3dPAVsIRVsPt_TrueLambda_BadCollAssig", kTH3F, {axisPA, axisIRBinning, axisPt});
+      histos.add("V0AssoQA/h3dDCADauVsIRVsPt_TrueLambda_BadCollAssig", "h3dDCADauVsIRVsPt_TrueLambda_BadCollAssig", kTH3F, {axisDCAdau, axisIRBinning, axisPt});
     }
 
     // MC
@@ -543,25 +552,37 @@ struct sigma0builder {
 
       float V0MCpT = RecoDecay::pt(array<float, 2>{v0MC.pxMC(), v0MC.pyMC()});
       float V0PA = TMath::ACos(v0.v0cosPA());
+      float V0DCADau = v0.dcaV0daughters();
       bool fIsV0CorrectlyAssigned = (v0MC.straMCCollisionId() == v0MCCollision.globalIndex());
       bool isPrimary = v0MC.isPhysicalPrimary();
 
-      if ((v0MC.pdgCode() == 22) && isPhotonAnalysis && isPrimary) { // True Gamma
-        histos.fill(HIST("V0AssoQA/h2dIRVsPt_TrueGamma"), IR, V0MCpT);
-        histos.fill(HIST("V0AssoQA/h3dPAVsIRVsPt_TrueGamma"), V0PA, IR, V0MCpT);
+      if (isPhotonAnalysis){
+        histos.fill(HIST("V0AssoQA/hGammaCand_pT"), V0MCpT);
+        if ((v0MC.pdgCode() == 22) && isPrimary) { // True Gamma
+          histos.fill(HIST("V0AssoQA/h2dIRVsPt_TrueGamma"), IR, V0MCpT);
+          histos.fill(HIST("V0AssoQA/h3dPAVsIRVsPt_TrueGamma"), V0PA, IR, V0MCpT);
+          histos.fill(HIST("V0AssoQA/h3dDCADauVsIRVsPt_TrueGamma"), V0DCADau, IR, V0MCpT);
 
-        if (!fIsV0CorrectlyAssigned) {
-          histos.fill(HIST("V0AssoQA/h2dIRVsPt_TrueGamma_BadCollAssig"), IR, V0MCpT);
-          histos.fill(HIST("V0AssoQA/h3dPAVsIRVsPt_TrueGamma_BadCollAssig"), V0PA, IR, V0MCpT);
+          if (!fIsV0CorrectlyAssigned) {
+            histos.fill(HIST("V0AssoQA/h2dIRVsPt_TrueGamma_BadCollAssig"), IR, V0MCpT);
+            histos.fill(HIST("V0AssoQA/h3dPAVsIRVsPt_TrueGamma_BadCollAssig"), V0PA, IR, V0MCpT);
+            histos.fill(HIST("V0AssoQA/h3dDCADauVsIRVsPt_TrueGamma_BadCollAssig"), V0DCADau, IR, V0MCpT);
+          }
         }
       }
-      if ((v0MC.pdgCode() == 3122) && !isPhotonAnalysis && isPrimary) { // True Lambda
-        histos.fill(HIST("V0AssoQA/h2dIRVsPt_TrueLambda"), IR, V0MCpT);
-        histos.fill(HIST("V0AssoQA/h3dPAVsIRVsPt_TrueLambda"), V0PA, IR, V0MCpT);
 
-        if (!fIsV0CorrectlyAssigned) {
-          histos.fill(HIST("V0AssoQA/h2dIRVsPt_TrueLambda_BadCollAssig"), IR, V0MCpT);
-          histos.fill(HIST("V0AssoQA/h3dPAVsIRVsPt_TrueLambda_BadCollAssig"), V0PA, IR, V0MCpT);
+      if (!isPhotonAnalysis){
+        histos.fill(HIST("V0AssoQA/hLambdaCand_pT"), V0MCpT);
+        if ((v0MC.pdgCode() == 3122) && isPrimary) { // True Lambda
+          histos.fill(HIST("V0AssoQA/h2dIRVsPt_TrueLambda"), IR, V0MCpT);
+          histos.fill(HIST("V0AssoQA/h3dPAVsIRVsPt_TrueLambda"), V0PA, IR, V0MCpT);
+          histos.fill(HIST("V0AssoQA/h3dDCADauVsIRVsPt_TrueLambda"), V0DCADau, IR, V0MCpT);
+
+          if (!fIsV0CorrectlyAssigned) {
+            histos.fill(HIST("V0AssoQA/h2dIRVsPt_TrueLambda_BadCollAssig"), IR, V0MCpT);
+            histos.fill(HIST("V0AssoQA/h3dPAVsIRVsPt_TrueLambda_BadCollAssig"), V0PA, IR, V0MCpT);
+            histos.fill(HIST("V0AssoQA/h3dDCADauVsIRVsPt_TrueLambda_BadCollAssig"), V0DCADau, IR, V0MCpT);
+          }
         }
       }
     }
@@ -868,6 +889,7 @@ struct sigma0builder {
       if ((gamma.v0radius() < PhotonMinRadius) || (gamma.v0radius() > PhotonMaxRadius))
         return false;
       histos.fill(HIST("PhotonSel/hSelectionStatistics"), 6.);
+      histos.fill(HIST("PhotonSel/hPhotonpT"), gamma.pt());
     }
     return true;
   }
@@ -910,6 +932,7 @@ struct sigma0builder {
       if (TMath::Abs(lambda.dcaV0daughters()) > LambdaMaxDCAV0Dau)
         return false;
       histos.fill(HIST("LambdaSel/hSelectionStatistics"), 6.);
+      histos.fill(HIST("LambdaSel/hLambdapT"), lambda.pt());
     }
 
     return true;
