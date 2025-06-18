@@ -247,6 +247,69 @@ DECLARE_SOA_TABLE(CascXiMLScores, "AOD", "CASCXIMLSCORES",
 DECLARE_SOA_TABLE(CascOmMLScores, "AOD", "CASCOMMLSCORES",
                   CascMLSelection::OmegaBDTScore);
 
+        
+namespace PhotonDuplicates
+{
+DECLARE_SOA_COLUMN(V0z, v0z, float);
+DECLARE_SOA_COLUMN(V0DCADau, v0DCADau, float);
+DECLARE_SOA_COLUMN(V0DCAxy, v0DCAxy, float);
+DECLARE_SOA_COLUMN(V0DCAz, v0DCAz, float);
+DECLARE_SOA_COLUMN(V0PA, v0PA, float);
+DECLARE_SOA_COLUMN(V0Radius, v0Radius, float);
+DECLARE_SOA_COLUMN(V0PosDCAToPV, v0PosDCAToPV, float);
+DECLARE_SOA_COLUMN(V0NegDCAToPV, v0NegDCAToPV, float);
+DECLARE_SOA_COLUMN(V0Phi, v0Phi, float);
+DECLARE_SOA_COLUMN(V0Collx, v0Collx, float);
+DECLARE_SOA_COLUMN(V0Colly, v0Colly, float);
+DECLARE_SOA_COLUMN(V0Collz, v0Collz, float);
+DECLARE_SOA_COLUMN(V0AvgDCAxy, v0AvgDCAxy, float);
+DECLARE_SOA_COLUMN(V0AvgDCAz, v0AvgDCAz, float);
+DECLARE_SOA_COLUMN(V0AvgPA, v0AvgPA, float);
+DECLARE_SOA_COLUMN(V0Avgz, v0Avgz, float);
+DECLARE_SOA_COLUMN(V0PhotonMass, v0PhotonMass, float);
+DECLARE_SOA_COLUMN(V0pt, v0pt, float);
+DECLARE_SOA_COLUMN(V0px, v0px, float);
+DECLARE_SOA_COLUMN(V0py, v0py, float);
+DECLARE_SOA_COLUMN(V0pz, v0pz, float);
+DECLARE_SOA_COLUMN(V0Y, v0Y, float);
+DECLARE_SOA_COLUMN(V0Eta, v0Eta, float);
+DECLARE_SOA_COLUMN(V0PosTrackTime, v0PosTrackTime, float);
+DECLARE_SOA_COLUMN(V0NegTrackTime, v0NegTrackTime, float);
+DECLARE_SOA_COLUMN(V0CollTime, v0CollTime, float);
+DECLARE_SOA_COLUMN(V0CollIdx, v0CollIdx, int);
+DECLARE_SOA_COLUMN(IsCorreclyAssoc, isCorreclyAssoc, bool);
+} // namespace PhotonDuplicates
+
+DECLARE_SOA_TABLE(V0Duplicates, "AOD", "V0DUPLICATES",
+                  PhotonDuplicates::V0z,
+                  PhotonDuplicates::V0DCADau,
+                  PhotonDuplicates::V0DCAxy,
+                  PhotonDuplicates::V0DCAz,
+                  PhotonDuplicates::V0PA,
+                  PhotonDuplicates::V0Radius,                  
+                  PhotonDuplicates::V0PosDCAToPV,
+                  PhotonDuplicates::V0NegDCAToPV,
+                  PhotonDuplicates::V0Phi,                  
+                  PhotonDuplicates::V0Collx,
+                  PhotonDuplicates::V0Colly,
+                  PhotonDuplicates::V0Collz,
+                  PhotonDuplicates::V0AvgDCAxy,
+                  PhotonDuplicates::V0AvgDCAz,
+                  PhotonDuplicates::V0AvgPA,
+                  PhotonDuplicates::V0Avgz,
+                  PhotonDuplicates::V0PhotonMass,
+                  PhotonDuplicates::V0pt,
+                  PhotonDuplicates::V0px,
+                  PhotonDuplicates::V0py,
+                  PhotonDuplicates::V0pz,
+                  PhotonDuplicates::V0Y,
+                  PhotonDuplicates::V0Eta,                  
+                  PhotonDuplicates::V0PosTrackTime,
+                  PhotonDuplicates::V0NegTrackTime,
+                  PhotonDuplicates::V0CollTime,                  
+                  PhotonDuplicates::V0CollIdx,                                    
+                  PhotonDuplicates::IsCorreclyAssoc);            
+
 } // namespace o2::aod
 
 #endif // PWGLF_DATAMODEL_LFSTRANGENESSMLTABLES_H_

@@ -19,6 +19,7 @@
 #include "Common/Core/RecoDecay.h"
 #include "Common/Core/trackUtilities.h"
 #include "PWGLF/DataModel/LFStrangenessTables.h"
+#include "PWGLF/DataModel/LFStrangenessMLTables.h"
 #include "PWGLF/DataModel/LFParticleIdentification.h"
 #include "Common/Core/TrackSelection.h"
 #include "Common/DataModel/McCollisionExtra.h"
@@ -64,6 +65,8 @@ using CollisionsWithEvSels = soa::Join<aod::Collisions, aod::EvSels>;
 using LabeledTracksExtra = soa::Join<aod::TracksIU, aod::TracksCovIU, aod::TracksExtra, aod::McTrackLabels>;
 
 struct v0assoqa {
+  Produces<aod::V0Duplicates> photonDuplicates;   
+
   HistogramRegistry histos{"Histos", {}, OutputObjHandlingPolicy::AnalysisObject};
 
   // helper object
@@ -77,6 +80,9 @@ struct v0assoqa {
 
   // for handling TPC-only tracks (photons)
   o2::aod::common::TPCVDriftManager mVDriftMgr;
+
+  // ML for deduplication 
+  Configurable<bool> fillDuplicatesTable{"fillDuplicatesTable", false, "if true, fill table with duplicated v0s"};
 
   // CCDB options
   struct : ConfigurableGroup {
@@ -151,6 +157,96 @@ struct v0assoqa {
       return -1;
 
     return motherid1;
+  }
+
+    //__________________________________________
+  // Helper structure to save v0 duplicates auxiliary info
+  struct V0DuplicateExtra {
+    float collX;
+    float collY;
+    float collZ;
+    float collTime;
+    float v0PosTrackTime;
+    float v0NegTrackTime;
+    float v0DauDCAxy;
+    float v0DauDCAz;
+    int v0CollIdx;    
+    bool v0IsCorrectlyAssociated;
+    bool isBuildOk;
+  };
+
+  //_______________________________________________________________________
+  // Fill tables with duplicated photons
+  void processDuplicatesTable(std::vector<o2::pwglf::v0candidate> v0duplicates, std::vector<V0DuplicateExtra> V0DuplicateExtras, std::vector<o2::pwglf::V0group> V0Grouped, size_t iV0)
+  {
+
+    float AvgPA = 0.0f;    
+    float AvgZ = 0.0f;    
+    float AvgDCAxy = 0.0f;
+    float AvgDCAz = 0.0f;
+
+    for (size_t ic = 0; ic < V0Grouped[iV0].collisionIds.size(); ic++) {    
+      if (!V0DuplicateExtras[ic].isBuildOk) {
+        continue; // skip not built V0s
+      }  
+      AvgPA += v0duplicates[ic].pointingAngle;
+      AvgDCAxy += V0DuplicateExtras[ic].v0DauDCAxy;
+      AvgDCAz += V0DuplicateExtras[ic].v0DauDCAz;
+    }
+
+    AvgPA /= V0Grouped[iV0].collisionIds.size();
+    AvgDCAxy /= V0Grouped[iV0].collisionIds.size();
+    AvgDCAz /= V0Grouped[iV0].collisionIds.size();
+
+    // fill duplicates table
+    for (size_t ic = 0; ic < V0Grouped[iV0].collisionIds.size(); ic++) {
+      if (!V0DuplicateExtras[ic].isBuildOk) {
+        continue; // skip not built V0s
+      }
+
+      float pxpos = v0duplicates[ic].positiveMomentum[0]; 
+      float pypos = v0duplicates[ic].positiveMomentum[1];
+      float pzpos = v0duplicates[ic].positiveMomentum[2];
+      float pxneg = v0duplicates[ic].negativeMomentum[0];
+      float pyneg = v0duplicates[ic].negativeMomentum[1];
+      float pzneg = v0duplicates[ic].negativeMomentum[2];
+
+      float v0px = pxpos + pxneg;
+      float v0py = pypos + pyneg;
+      float v0pz = pzpos + pzneg;
+
+      float v0Z = v0duplicates[ic].position[2];
+      float v0DCADau = v0duplicates[ic].daughterDCA;
+      float v0DCAxy = V0DuplicateExtras[ic].v0DauDCAxy;
+      float v0DCAz = V0DuplicateExtras[ic].v0DauDCAz;
+      float v0PA = v0duplicates[ic].pointingAngle;
+      float v0Radius = RecoDecay::sqrtSumOfSquares(v0duplicates[ic].position[0], v0duplicates[ic].position[1]);
+      float v0PosDCAToPV = v0duplicates[ic].positiveDCAxy;
+      float v0NegDCAToPV = v0duplicates[ic].negativeDCAxy;
+      float v0Phi = RecoDecay::phi(v0px, v0py);
+      float collX = V0DuplicateExtras[ic].collX;
+      float collY = V0DuplicateExtras[ic].collY;
+      float collZ = V0DuplicateExtras[ic].collZ;      
+
+      float v0PhotonMass = RecoDecay::m(std::array{std::array{pxpos, pypos, pzpos}, std::array{pxneg, pyneg, pzneg}}, std::array{o2::constants::physics::MassElectron, o2::constants::physics::MassElectron});
+      float v0pt = RecoDecay::sqrtSumOfSquares(v0px, v0py);
+      
+      float v0Y = RecoDecay::y(std::array{v0px, v0py, v0pz}, o2::constants::physics::MassElectron);
+      float v0Eta = RecoDecay::eta(std::array{v0px, v0py, v0pz});
+      
+      float v0PosTrackTime = V0DuplicateExtras[ic].v0PosTrackTime;
+      float v0NegTrackTime = V0DuplicateExtras[ic].v0NegTrackTime;
+      float collTime = V0DuplicateExtras[ic].collTime;
+      int v0CollIdx = V0DuplicateExtras[ic].v0CollIdx;
+      bool v0IsCorrectlyAssociated = V0DuplicateExtras[ic].v0IsCorrectlyAssociated;
+
+      // fill table
+      photonDuplicates(v0Z, v0DCADau, v0DCAxy, v0DCAz, v0PA, v0Radius, v0PosDCAToPV, v0NegDCAToPV, v0Phi,
+                       collX, collY, collZ, AvgDCAxy, AvgDCAz, AvgPA, AvgZ,
+                       v0PhotonMass, v0pt, v0px, v0py, v0pz, v0Y, v0Eta, 
+                       v0PosTrackTime, v0NegTrackTime, collTime,
+                       v0CollIdx, v0IsCorrectlyAssociated);
+    }
   }
 
   void init(InitContext const&)
@@ -257,6 +353,7 @@ struct v0assoqa {
     return true;
   }
 
+
   void process(soa::Join<aod::Collisions, aod::McCollisionLabels, aod::EvSels> const& collisions, aod::McCollisions const& mcCollisions, aod::V0s const& V0s, LabeledTracksExtra const& tracks, aod::McParticles const& mcParticles, aod::BCsWithTimestamps const& bcs)
   {
     if (!initCCDB(bcs, collisions))
@@ -321,6 +418,7 @@ struct v0assoqa {
 
         std::vector<o2::pwglf::v0candidate> v0duplicates; // Vector of v0 candidate duplicates
         std::vector<bool> v0duplicatesCorrectlyAssociated;
+        std::vector<V0DuplicateExtra> V0DuplicateExtras; // Vector to store V0 duplicate info
 
         // de-duplication strategy tests start here
         // store best-of index for cross-checking strict de-duplication techniques
@@ -349,9 +447,7 @@ struct v0assoqa {
               correctlyAssociated = true;
             }
           }
-          // store check for correct association
-          v0duplicatesCorrectlyAssociated.push_back(correctlyAssociated);
-
+          
           // actually treat tracks
           auto posTrackPar = getTrackParCov(pTrack);
           auto negTrackPar = getTrackParCov(nTrack);
@@ -383,10 +479,9 @@ struct v0assoqa {
             }
           } // end TPC drift treatment
 
+          
           // process candidate with helper
-          bool buildOK = straHelper.buildV0Candidate(v0tableGrouped[iV0].collisionIds[ic], collision.posX(), collision.posY(), collision.posZ(), pTrack, nTrack, posTrackPar, negTrackPar, true, false);
-
-          v0duplicates.push_back(straHelper.v0);
+          bool buildOK = straHelper.buildV0Candidate<false>(v0tableGrouped[iV0].collisionIds[ic], collision.posX(), collision.posY(), collision.posZ(), pTrack, nTrack, posTrackPar, negTrackPar, true, false, true);                              
 
           float daughterDCA3D = std::hypot(
             straHelper.v0.positivePosition[0] - straHelper.v0.negativePosition[0],
@@ -401,6 +496,25 @@ struct v0assoqa {
           if (!buildOK) {
             daughterDCA3D = daughterDCAXY = daughterDCAZ = 1e+6;
           }
+
+          // V0 Duplicates extras
+          V0DuplicateExtra v0DuplicateInfo;
+          v0DuplicateInfo.collX = collision.posX();
+          v0DuplicateInfo.collY = collision.posY();
+          v0DuplicateInfo.collZ = collision.posZ();
+          v0DuplicateInfo.collTime = collision.collisionTime();
+          v0DuplicateInfo.v0PosTrackTime = pTrack.trackTime();
+          v0DuplicateInfo.v0NegTrackTime = nTrack.trackTime();
+          v0DuplicateInfo.v0DauDCAxy = daughterDCAXY;
+          v0DuplicateInfo.v0DauDCAz = daughterDCAZ;
+          v0DuplicateInfo.v0CollIdx = v0tableGrouped[iV0].collisionIds[ic];
+          v0DuplicateInfo.v0IsCorrectlyAssociated = correctlyAssociated;
+          v0DuplicateInfo.isBuildOk = buildOK;
+          
+          // store check for correct association + saving duplicates info
+          v0duplicatesCorrectlyAssociated.push_back(correctlyAssociated);
+          v0duplicates.push_back(straHelper.v0);
+          V0DuplicateExtras.push_back(v0DuplicateInfo);
 
           histos.fill(HIST("hPA_All"), straHelper.v0.pointingAngle);
           histos.fill(HIST("hPAvsPt_All"), mcV0.pt(), straHelper.v0.pointingAngle);
@@ -462,6 +576,8 @@ struct v0assoqa {
             histos.fill(HIST("hCorrect_BestPAandDCADau3D"), mcV0.pt());
           }
         }
+
+        if (fillDuplicatesTable) processDuplicatesTable(v0duplicates, V0DuplicateExtras, v0tableGrouped, iV0);
 
         // printout for inspection
         // TString cosPAString = "";
