@@ -84,6 +84,9 @@ struct v0assoqa {
   // ML for deduplication 
   Configurable<bool> fillDuplicatesTable{"fillDuplicatesTable", false, "if true, fill table with duplicated v0s"};
 
+  // Select only built v0s
+  Configurable<bool> selectBuiltOnly{"selectBuiltOnly", true, "if true, select only built v0s"};
+
   // CCDB options
   struct : ConfigurableGroup {
     std::string prefix = "ccdb";
@@ -437,9 +440,6 @@ struct v0assoqa {
 
         // START OF MAIN DUPLICATE LOOP IS HERE
         for (size_t ic = 0; ic < v0tableGrouped[iV0].collisionIds.size(); ic++) {
-          // simple duplicate accounting
-          histos.fill(HIST("hPhotonPt_Duplicates"), mcV0.pt());
-
           // check if candidate is correctly associated
           bool correctlyAssociated = false;
           for (size_t imcc = 0; imcc < mcCollToColl[correctMcCollision].size(); imcc++) {
@@ -479,9 +479,15 @@ struct v0assoqa {
             }
           } // end TPC drift treatment
 
-          
           // process candidate with helper
           bool buildOK = straHelper.buildV0Candidate<false>(v0tableGrouped[iV0].collisionIds[ic], collision.posX(), collision.posY(), collision.posZ(), pTrack, nTrack, posTrackPar, negTrackPar, true, false, true);                              
+
+          if (!buildOK && selectBuiltOnly) {            
+            continue; // skip not built V0s
+          }
+
+          // simple duplicate accounting
+          histos.fill(HIST("hPhotonPt_Duplicates"), mcV0.pt());
 
           float daughterDCA3D = std::hypot(
             straHelper.v0.positivePosition[0] - straHelper.v0.negativePosition[0],
