@@ -34,6 +34,8 @@
 #include "CCDB/BasicCCDBManager.h"
 #include "PWGLF/Utils/strangenessBuilderHelper.h"
 #include "Common/Core/TPCVDriftManager.h"
+#include "Tools/ML/MlResponse.h"
+#include "Tools/ML/model.h"
 
 #include <TFile.h>
 #include <TH2F.h>
@@ -50,6 +52,7 @@
 using namespace o2;
 using namespace o2::framework;
 using namespace o2::framework::expressions;
+using namespace o2::ml;
 using std::array;
 
 // using MyTracks = soa::Join<aod::Tracks, aod::TracksExtra, aod::pidTPCPr>;
@@ -64,8 +67,20 @@ using CollisionsWithEvSels = soa::Join<aod::Collisions, aod::EvSels>;
 // For MC association in pre-selection
 using LabeledTracksExtra = soa::Join<aod::TracksIU, aod::TracksCovIU, aod::TracksExtra, aod::McTrackLabels>;
 
-struct v0assoqa {
-  Produces<aod::V0Duplicates> photonDuplicates;   
+struct v0assoqa {  
+  o2::ml::OnnxModel deduplication_bdt; 
+
+  Produces<aod::V0Duplicates> photonDuplicates;  
+  
+  std::map<std::string, std::string> metadata;
+  Configurable<std::string> ccdbUrl{"ccdb-url", "http://alice-ccdb.cern.ch", "url of the ccdb repository"};
+  Configurable<std::string> BDTLocalPath{"BDTLocalPath", "Deduplication_BDTModel.onnx", "(std::string) Path to the local .onnx file."};
+  Configurable<std::string> BDTPathCCDB{"BDTPathCCDB", "Users/g/gsetouel/MLModels2", "Path on CCDB"};
+  Configurable<int64_t> timestampCCDB{"timestampCCDB", -1, "timestamp of the ONNX file for ML model used to query in CCDB.  Exceptions: > 0 for the specific timestamp, 0 gets the run dependent timestamp"};
+  Configurable<bool> loadModelsFromCCDB{"loadModelsFromCCDB", false, "Flag to enable or disable the loading of models from CCDB"};
+  Configurable<bool> enableOptimizations{"enableOptimizations", false, "Enables the ONNX extended model-optimization: sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED)"};
+  Configurable<bool> PredictV0Association{"PredictV0Association", false, "Flag to enable or disable the loading of model"};
+  Configurable<float> BDTthreshold{"BDTthreshold", -1, "BDT threshold for deduplication. If -1, no threshold is applied."};
 
   HistogramRegistry histos{"Histos", {}, OutputObjHandlingPolicy::AnalysisObject};
 
@@ -125,6 +140,146 @@ struct v0assoqa {
     Configurable<float> maxDaughterEta{"maxDaughterEta", 5.0, "Maximum daughter eta (in abs value)"};
   } cascadeBuilderOpts;
 
+  // Axis
+  // base properties
+  ConfigurableAxis axisPt{"axisPt", {VARIABLE_WIDTH, 0.0f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 1.9f, 2.0f, 2.2f, 2.4f, 2.6f, 2.8f, 3.0f, 3.2f, 3.4f, 3.6f, 3.8f, 4.0f, 4.4f, 4.8f, 5.2f, 5.6f, 6.0f, 6.5f, 7.0f, 7.5f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 17.0f, 19.0f, 21.0f, 23.0f, 25.0f, 30.0f, 35.0f, 40.0f, 50.0f}, "pt axis for analysis"};
+  ConfigurableAxis axisPA{"axisPA", {200, 0.0f, 1.0f}, "Pointing angle"};
+  ConfigurableAxis axisBDTScore{"axisBDTScore", {200, 0.0f, 1.0f}, "BDT Score"};
+  ConfigurableAxis axisDCAz{"axisDCAz", {200, -50.0f, 50.0f}, "DCAz"};
+  
+    void init(InitContext const&)
+  {
+    histos.add("hDuplicateCount", "hDuplicateCount", kTH1F, {{50, -0.5f, 49.5f}});
+    histos.add("hDuplicateCountType7", "hDuplicateCountType7", kTH1F, {{50, -0.5f, 49.5f}});
+    histos.add("hDuplicateCountType7allTPConly", "hDuplicateCountType7allTPConly", kTH1F, {{50, -0.5f, 49.5f}});
+
+    histos.add("hPhotonPt", "hPhotonPt", kTH1F, {{200, 0.0f, 20.0f}});
+    histos.add("hPhotonPt_Duplicates", "hPhotonPt_Duplicates", kTH1F, {{200, 0.0f, 20.0f}});
+    histos.add("hPhotonPt_withRecoedMcCollision", "hPhotonPt_withRecoedMcCollision", kTH1F, {{200, 0.0f, 20.0f}});
+    histos.add("hPhotonPt_withCorrectCollisionCopy", "hPhotonPt_withCorrectCollisionCopy", kTH1F, {{200, 0.0f, 20.0f}});
+
+    histos.add("hPA_All", "hPA_All", kTH1F, {{100, 0.0f, 1.0f}});
+    histos.add("hPA_Correct", "hPA_Correct", kTH1F, {{100, 0.0f, 1.0f}});
+
+    // 2D for <de-duplication criteria> vs pT
+    histos.add("hPAvsPt_All", "hPAvsPt_All", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 1.0f}});
+    histos.add("hPAvsPt_Correct", "hPAvsPt_Correct", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 1.0f}});
+    histos.add("hDCADaughtersvsPt_All", "hDCADaughtersvsPt_All", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
+    histos.add("hDCADaughtersvsPt_Correct", "hDCADaughtersvsPt_Correct", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
+    histos.add("hDCADaughters3DvsPt_All", "hDCADaughters3DvsPt_All", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
+    histos.add("hDCADaughters3DvsPt_Correct", "hDCADaughters3DvsPt_Correct", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
+    histos.add("hDCADaughtersXYvsPt_All", "hDCADaughtersXYvsPt_All", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
+    histos.add("hDCADaughtersXYvsPt_Correct", "hDCADaughtersXYvsPt_Correct", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
+    histos.add("hDCADaughtersZvsPt_All", "hDCADaughtersZvsPt_All", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
+    histos.add("hDCADaughtersZvsPt_Correct", "hDCADaughtersZvsPt_Correct", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
+
+    // winner-takes-all criteria spectra
+    histos.add("hCorrect_BestPA", "hCorrect_BestPA", kTH1F, {{200, 0.0f, 20.0f}});
+    histos.add("hCorrect_BestDCADau", "hCorrect_DCADau", kTH1F, {{200, 0.0f, 20.0f}});
+    histos.add("hCorrect_BestDCADau3D", "hCorrect_DCADau3D", kTH1F, {{200, 0.0f, 20.0f}});
+    histos.add("hCorrect_BestDCADauXY", "hCorrect_DCADauXY", kTH1F, {{200, 0.0f, 20.0f}});
+    histos.add("hCorrect_BestDCADauZ", "hCorrect_DCADauZ", kTH1F, {{200, 0.0f, 20.0f}});
+    histos.add("hCorrect_BestPAandDCADau3D", "hCorrect_BestPAandDCADau3D", kTH1F, {{200, 0.0f, 20.0f}});
+
+    // Deduplication with Machine Learning    
+    auto h3dMLScoreVsPt_Gamma = histos.add<TH3>("h3dMLScoreVsPt_Gamma", "h3dMLScoreVsPt_Gamma", kTH3F, {{2, -0.5f, 1.5f}, axisBDTScore, axisPt});
+    h3dMLScoreVsPt_Gamma->GetXaxis()->SetBinLabel(1, "Wrong Association");
+    h3dMLScoreVsPt_Gamma->GetXaxis()->SetBinLabel(2, "Correct collision");
+
+    histos.add("h3dPAVsDCAzVsPt_Gamma", "h3dPAVsDCAzVsPt_Gamma", kTH3F, {axisPA, axisDCAz, axisPt});    
+    histos.add("h3dPAVsDCAzVsPt_Gamma_BadCollAssig", "h3dPAVsDCAzVsPt_Gamma_BadCollAssig", kTH3F, {axisPA, axisDCAz, axisPt});
+    
+    ccdb->setURL(ccdbConfigurations.ccdburl);
+    ccdb->setCaching(true);
+    ccdb->setLocalObjectValidityChecking();
+    ccdb->setFatalWhenNull(false);
+
+    // set V0 parameters in the helper
+    straHelper.v0selections.minCrossedRows = v0BuilderOpts.minCrossedRows;
+    straHelper.v0selections.dcanegtopv = v0BuilderOpts.dcanegtopv;
+    straHelper.v0selections.dcapostopv = v0BuilderOpts.dcapostopv;
+    straHelper.v0selections.v0cospa = v0BuilderOpts.v0cospa;
+    straHelper.v0selections.dcav0dau = v0BuilderOpts.dcav0dau;
+    straHelper.v0selections.v0radius = v0BuilderOpts.v0radius;
+    straHelper.v0selections.maxDaughterEta = v0BuilderOpts.maxDaughterEta;
+
+    // set cascade parameters in the helper
+    straHelper.cascadeselections.minCrossedRows = cascadeBuilderOpts.minCrossedRows;
+    straHelper.cascadeselections.dcabachtopv = cascadeBuilderOpts.dcabachtopv;
+    straHelper.cascadeselections.cascradius = cascadeBuilderOpts.cascradius;
+    straHelper.cascadeselections.casccospa = cascadeBuilderOpts.casccospa;
+    straHelper.cascadeselections.dcacascdau = cascadeBuilderOpts.dcacascdau;
+    straHelper.cascadeselections.lambdaMassWindow = cascadeBuilderOpts.lambdaMassWindow;
+    straHelper.cascadeselections.maxDaughterEta = cascadeBuilderOpts.maxDaughterEta;
+        
+    
+    if (PredictV0Association) {
+      if (loadModelsFromCCDB) { 
+        // Retrieve the model from CCDB
+        ccdbApi.init(ccdbUrl);
+
+        /// Fetching model for specific timestamp
+        LOG(info) << "Fetching model for timestamp: " << timestampCCDB.value;
+        
+        bool retrieveSuccess = ccdbApi.retrieveBlob(BDTPathCCDB.value, ".", metadata, timestampCCDB.value, false, BDTLocalPath.value);
+        if (retrieveSuccess) {
+          deduplication_bdt.initModel(BDTLocalPath.value, enableOptimizations.value);
+        } else {
+          LOG(fatal) << "Error encountered while fetching/loading the Gamma model from CCDB! Maybe the model doesn't exist yet for this runnumber/timestamp?";
+        }
+      }
+      else{
+        deduplication_bdt.initModel(BDTLocalPath.value, enableOptimizations.value);      
+      }         
+    } 
+  }
+
+  template <typename TCollisions>
+  bool initCCDB(aod::BCsWithTimestamps const& bcs, TCollisions const& collisions)
+  {
+    auto bc = collisions.size() ? collisions.begin().template bc_as<aod::BCsWithTimestamps>() : bcs.begin();
+    if (!bcs.size()) {
+      LOGF(warn, "No BC found, skipping this DF.");
+      return false; // signal to skip this DF
+    }
+
+    if (mRunNumber == bc.runNumber()) {
+      return true;
+    }
+
+    auto timestamp = bc.timestamp();
+    o2::parameters::GRPMagField* grpmag = 0x0;
+
+    grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(ccdbConfigurations.grpmagPath, timestamp);
+    if (!grpmag) {
+      LOG(fatal) << "Got nullptr from CCDB for path " << ccdbConfigurations.grpmagPath << " of object GRPMagField for timestamp " << timestamp;
+    }
+    o2::base::Propagator::initFieldFromGRP(grpmag);
+
+    // Fetch magnetic field from ccdb for current collision
+    auto magneticField = o2::base::Propagator::Instance()->getNominalBz();
+    LOG(info) << "Retrieved GRP for timestamp " << timestamp << " with magnetic field of " << magneticField << " kG";
+
+    // Set magnetic field value once known
+    straHelper.fitter.setBz(magneticField);
+
+    // acquire LUT for this timestamp
+    LOG(info) << "Loading material look-up table for timestamp: " << timestamp;
+    lut = o2::base::MatLayerCylSet::rectifyPtrFromFile(ccdb->getForTimeStamp<o2::base::MatLayerCylSet>(ccdbConfigurations.lutPath, timestamp));
+    o2::base::Propagator::Instance()->setMatLUT(lut);
+    straHelper.lut = lut;
+
+    LOG(info) << "Fully configured for run: " << bc.runNumber();
+    // mmark this run as configured
+    mRunNumber = bc.runNumber();
+
+    // initialize only if needed, avoid unnecessary CCDB calls
+    mVDriftMgr.init(&ccdb->instance());
+    mVDriftMgr.update(timestamp);
+
+    return true;
+  }
+  
   //_______________________________________________________________________
   template <typename TMCParticles>
   int findMotherFromLabels(int const& p1, int const& p2, const int expected_pdg1, const int expected_pdg2, const int expected_mother_pdg, TMCParticles const& mcparticles)
@@ -173,23 +328,23 @@ struct v0assoqa {
     float v0NegTrackTime;
     float v0DauDCAxy;
     float v0DauDCAz;
+    float v0MCpT;
     int v0CollIdx;    
     bool v0IsCorrectlyAssociated;
     bool isBuildOk;
   };
 
   //_______________________________________________________________________
-  // Fill tables with duplicated photons
-  void processDuplicatesTable(std::vector<o2::pwglf::v0candidate> v0duplicates, std::vector<V0DuplicateExtra> V0DuplicateExtras, std::vector<o2::pwglf::V0group> V0Grouped, size_t iV0)
+  // Process duplicated photons
+  void processDuplicates(std::vector<o2::pwglf::v0candidate> v0duplicates, std::vector<V0DuplicateExtra> V0DuplicateExtras, std::vector<o2::pwglf::V0group> V0Grouped, size_t iV0)
   {
-
     float AvgPA = 0.0f;    
     float AvgZ = 0.0f;    
     float AvgDCAxy = 0.0f;
     float AvgDCAz = 0.0f;
 
     for (size_t ic = 0; ic < V0Grouped[iV0].collisionIds.size(); ic++) {    
-      if (!V0DuplicateExtras[ic].isBuildOk) {
+      if (!V0DuplicateExtras[ic].isBuildOk && selectBuiltOnly) {
         continue; // skip not built V0s
       }  
       AvgPA += v0duplicates[ic].pointingAngle;
@@ -203,7 +358,8 @@ struct v0assoqa {
 
     // fill duplicates table
     for (size_t ic = 0; ic < V0Grouped[iV0].collisionIds.size(); ic++) {
-      if (!V0DuplicateExtras[ic].isBuildOk) {
+                
+      if (!V0DuplicateExtras[ic].isBuildOk && selectBuiltOnly) {
         continue; // skip not built V0s
       }
 
@@ -233,6 +389,7 @@ struct v0assoqa {
 
       float v0PhotonMass = RecoDecay::m(std::array{std::array{pxpos, pypos, pzpos}, std::array{pxneg, pyneg, pzneg}}, std::array{o2::constants::physics::MassElectron, o2::constants::physics::MassElectron});
       float v0pt = RecoDecay::sqrtSumOfSquares(v0px, v0py);
+      float v0mcpt = V0DuplicateExtras[ic].v0MCpT;
       
       float v0Y = RecoDecay::y(std::array{v0px, v0py, v0pz}, o2::constants::physics::MassElectron);
       float v0Eta = RecoDecay::eta(std::array{v0px, v0py, v0pz});
@@ -243,119 +400,39 @@ struct v0assoqa {
       int v0CollIdx = V0DuplicateExtras[ic].v0CollIdx;
       bool v0IsCorrectlyAssociated = V0DuplicateExtras[ic].v0IsCorrectlyAssociated;
 
+      float BDTScore = -1.0f;
+      // Simple test of deduplication mode 4
+      if (PredictV0Association) {
+
+        // Define input features for the BDT
+        std::vector<float> inputFeatures{v0Z, v0DCADau, v0DCAxy, v0DCAz, v0PA, v0Radius,
+                                           v0PosDCAToPV, v0NegDCAToPV, v0Phi, collX, collY,
+                                           collZ, AvgDCAxy, AvgDCAz, AvgPA, AvgZ,
+                                           v0pt, v0pz, v0PosTrackTime, v0NegTrackTime, collTime};
+
+        float* BDTProbability = deduplication_bdt.evalModel(inputFeatures);
+        BDTScore = BDTProbability[1];
+        
+        histos.fill(HIST("h3dMLScoreVsPt_Gamma"), v0IsCorrectlyAssociated, BDTScore, v0mcpt);        
+        histos.fill(HIST("h3dPAVsDCAzVsPt_Gamma"), v0PA, v0DCAz, v0mcpt);
+      
+        // Optionally select on BDT score
+        if (BDTthreshold > 0 && BDTScore >= BDTthreshold) {          
+          if (!v0IsCorrectlyAssociated) {            
+            histos.fill(HIST("h3dPAVsDCAzVsPt_Gamma_BadCollAssig"), v0PA, v0DCAz, v0mcpt);
+          }
+        }
+      }
+
       // fill table
-      photonDuplicates(v0Z, v0DCADau, v0DCAxy, v0DCAz, v0PA, v0Radius, v0PosDCAToPV, v0NegDCAToPV, v0Phi,
+      if (fillDuplicatesTable) 
+        photonDuplicates(v0Z, v0DCADau, v0DCAxy, v0DCAz, v0PA, v0Radius, v0PosDCAToPV, v0NegDCAToPV, v0Phi,
                        collX, collY, collZ, AvgDCAxy, AvgDCAz, AvgPA, AvgZ,
                        v0PhotonMass, v0pt, v0px, v0py, v0pz, v0Y, v0Eta, 
                        v0PosTrackTime, v0NegTrackTime, collTime,
                        v0CollIdx, v0IsCorrectlyAssociated);
     }
   }
-
-  void init(InitContext const&)
-  {
-    histos.add("hDuplicateCount", "hDuplicateCount", kTH1F, {{50, -0.5f, 49.5f}});
-    histos.add("hDuplicateCountType7", "hDuplicateCountType7", kTH1F, {{50, -0.5f, 49.5f}});
-    histos.add("hDuplicateCountType7allTPConly", "hDuplicateCountType7allTPConly", kTH1F, {{50, -0.5f, 49.5f}});
-
-    histos.add("hPhotonPt", "hPhotonPt", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hPhotonPt_Duplicates", "hPhotonPt_Duplicates", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hPhotonPt_withRecoedMcCollision", "hPhotonPt_withRecoedMcCollision", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hPhotonPt_withCorrectCollisionCopy", "hPhotonPt_withCorrectCollisionCopy", kTH1F, {{200, 0.0f, 20.0f}});
-
-    histos.add("hPA_All", "hPA_All", kTH1F, {{100, 0.0f, 1.0f}});
-    histos.add("hPA_Correct", "hPA_Correct", kTH1F, {{100, 0.0f, 1.0f}});
-
-    // 2D for <de-duplication criteria> vs pT
-    histos.add("hPAvsPt_All", "hPAvsPt_All", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 1.0f}});
-    histos.add("hPAvsPt_Correct", "hPAvsPt_Correct", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 1.0f}});
-    histos.add("hDCADaughtersvsPt_All", "hDCADaughtersvsPt_All", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
-    histos.add("hDCADaughtersvsPt_Correct", "hDCADaughtersvsPt_Correct", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
-    histos.add("hDCADaughters3DvsPt_All", "hDCADaughters3DvsPt_All", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
-    histos.add("hDCADaughters3DvsPt_Correct", "hDCADaughters3DvsPt_Correct", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
-    histos.add("hDCADaughtersXYvsPt_All", "hDCADaughtersXYvsPt_All", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
-    histos.add("hDCADaughtersXYvsPt_Correct", "hDCADaughtersXYvsPt_Correct", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
-    histos.add("hDCADaughtersZvsPt_All", "hDCADaughtersZvsPt_All", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
-    histos.add("hDCADaughtersZvsPt_Correct", "hDCADaughtersZvsPt_Correct", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
-
-    // winner-takes-all criteria spectra
-    histos.add("hCorrect_BestPA", "hCorrect_BestPA", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hCorrect_BestDCADau", "hCorrect_DCADau", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hCorrect_BestDCADau3D", "hCorrect_DCADau3D", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hCorrect_BestDCADauXY", "hCorrect_DCADauXY", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hCorrect_BestDCADauZ", "hCorrect_DCADauZ", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hCorrect_BestPAandDCADau3D", "hCorrect_BestPAandDCADau3D", kTH1F, {{200, 0.0f, 20.0f}});
-
-    ccdb->setURL(ccdbConfigurations.ccdburl);
-    ccdb->setCaching(true);
-    ccdb->setLocalObjectValidityChecking();
-    ccdb->setFatalWhenNull(false);
-
-    // set V0 parameters in the helper
-    straHelper.v0selections.minCrossedRows = v0BuilderOpts.minCrossedRows;
-    straHelper.v0selections.dcanegtopv = v0BuilderOpts.dcanegtopv;
-    straHelper.v0selections.dcapostopv = v0BuilderOpts.dcapostopv;
-    straHelper.v0selections.v0cospa = v0BuilderOpts.v0cospa;
-    straHelper.v0selections.dcav0dau = v0BuilderOpts.dcav0dau;
-    straHelper.v0selections.v0radius = v0BuilderOpts.v0radius;
-    straHelper.v0selections.maxDaughterEta = v0BuilderOpts.maxDaughterEta;
-
-    // set cascade parameters in the helper
-    straHelper.cascadeselections.minCrossedRows = cascadeBuilderOpts.minCrossedRows;
-    straHelper.cascadeselections.dcabachtopv = cascadeBuilderOpts.dcabachtopv;
-    straHelper.cascadeselections.cascradius = cascadeBuilderOpts.cascradius;
-    straHelper.cascadeselections.casccospa = cascadeBuilderOpts.casccospa;
-    straHelper.cascadeselections.dcacascdau = cascadeBuilderOpts.dcacascdau;
-    straHelper.cascadeselections.lambdaMassWindow = cascadeBuilderOpts.lambdaMassWindow;
-    straHelper.cascadeselections.maxDaughterEta = cascadeBuilderOpts.maxDaughterEta;
-  }
-
-  template <typename TCollisions>
-  bool initCCDB(aod::BCsWithTimestamps const& bcs, TCollisions const& collisions)
-  {
-    auto bc = collisions.size() ? collisions.begin().template bc_as<aod::BCsWithTimestamps>() : bcs.begin();
-    if (!bcs.size()) {
-      LOGF(warn, "No BC found, skipping this DF.");
-      return false; // signal to skip this DF
-    }
-
-    if (mRunNumber == bc.runNumber()) {
-      return true;
-    }
-
-    auto timestamp = bc.timestamp();
-    o2::parameters::GRPMagField* grpmag = 0x0;
-
-    grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(ccdbConfigurations.grpmagPath, timestamp);
-    if (!grpmag) {
-      LOG(fatal) << "Got nullptr from CCDB for path " << ccdbConfigurations.grpmagPath << " of object GRPMagField for timestamp " << timestamp;
-    }
-    o2::base::Propagator::initFieldFromGRP(grpmag);
-
-    // Fetch magnetic field from ccdb for current collision
-    auto magneticField = o2::base::Propagator::Instance()->getNominalBz();
-    LOG(info) << "Retrieved GRP for timestamp " << timestamp << " with magnetic field of " << magneticField << " kG";
-
-    // Set magnetic field value once known
-    straHelper.fitter.setBz(magneticField);
-
-    // acquire LUT for this timestamp
-    LOG(info) << "Loading material look-up table for timestamp: " << timestamp;
-    lut = o2::base::MatLayerCylSet::rectifyPtrFromFile(ccdb->getForTimeStamp<o2::base::MatLayerCylSet>(ccdbConfigurations.lutPath, timestamp));
-    o2::base::Propagator::Instance()->setMatLUT(lut);
-    straHelper.lut = lut;
-
-    LOG(info) << "Fully configured for run: " << bc.runNumber();
-    // mmark this run as configured
-    mRunNumber = bc.runNumber();
-
-    // initialize only if needed, avoid unnecessary CCDB calls
-    mVDriftMgr.init(&ccdb->instance());
-    mVDriftMgr.update(timestamp);
-
-    return true;
-  }
-
 
   void process(soa::Join<aod::Collisions, aod::McCollisionLabels, aod::EvSels> const& collisions, aod::McCollisions const& mcCollisions, aod::V0s const& V0s, LabeledTracksExtra const& tracks, aod::McParticles const& mcParticles, aod::BCsWithTimestamps const& bcs)
   {
@@ -481,11 +558,7 @@ struct v0assoqa {
 
           // process candidate with helper
           bool buildOK = straHelper.buildV0Candidate<false>(v0tableGrouped[iV0].collisionIds[ic], collision.posX(), collision.posY(), collision.posZ(), pTrack, nTrack, posTrackPar, negTrackPar, true, false, true);                              
-
-          if (!buildOK && selectBuiltOnly) {            
-            continue; // skip not built V0s
-          }
-
+          
           // simple duplicate accounting
           histos.fill(HIST("hPhotonPt_Duplicates"), mcV0.pt());
 
@@ -513,6 +586,7 @@ struct v0assoqa {
           v0DuplicateInfo.v0NegTrackTime = nTrack.trackTime();
           v0DuplicateInfo.v0DauDCAxy = daughterDCAXY;
           v0DuplicateInfo.v0DauDCAz = daughterDCAZ;
+          v0DuplicateInfo.v0MCpT = mcV0.pt();
           v0DuplicateInfo.v0CollIdx = v0tableGrouped[iV0].collisionIds[ic];
           v0DuplicateInfo.v0IsCorrectlyAssociated = correctlyAssociated;
           v0DuplicateInfo.isBuildOk = buildOK;
@@ -558,7 +632,7 @@ struct v0assoqa {
           if (daughterDCAZ < bestDCADaughtersZ) {
             bestDCADaughtersZ = daughterDCAZ;
             bestDCADaughtersZCorrect = correctlyAssociated;
-          }
+          }      
         } // end duplicate loop
 
         if (hasCorrectCollisionCopy) {
@@ -583,7 +657,7 @@ struct v0assoqa {
           }
         }
 
-        if (fillDuplicatesTable) processDuplicatesTable(v0duplicates, V0DuplicateExtras, v0tableGrouped, iV0);
+        if (fillDuplicatesTable || PredictV0Association) processDuplicates(v0duplicates, V0DuplicateExtras, v0tableGrouped, iV0);
 
         // printout for inspection
         // TString cosPAString = "";
