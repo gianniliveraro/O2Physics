@@ -54,6 +54,9 @@ using namespace o2::framework;
 using namespace o2::framework::expressions;
 using namespace o2::ml;
 using std::array;
+using std::vector;
+using std::pair;
+using std::make_pair;
 
 // using MyTracks = soa::Join<aod::Tracks, aod::TracksExtra, aod::pidTPCPr>;
 using TracksCompleteIU = soa::Join<aod::TracksIU, aod::TracksExtra, aod::TracksCovIU, aod::TracksDCA>;
@@ -125,6 +128,7 @@ struct v0assoqa {
     Configurable<float> dcav0dau{"dcav0dau", 10000.0, "DCA V0 Daughters"};
     Configurable<float> v0radius{"v0radius", 0.0, "v0radius"};
     Configurable<float> maxDaughterEta{"maxDaughterEta", 5.0, "Maximum daughter eta (in abs value)"};
+    Configurable<float> PhotonMaxMass{"PhotonMaxMass", 0.1, "Max photon mass (GeV/c^{2})"};
   } v0BuilderOpts;
 
   // cascade building options
@@ -140,54 +144,70 @@ struct v0assoqa {
     Configurable<float> maxDaughterEta{"maxDaughterEta", 5.0, "Maximum daughter eta (in abs value)"};
   } cascadeBuilderOpts;
 
+    // V0 building options
+  struct : ConfigurableGroup {
+    std::string prefix = "MCAssociationOpts";
+    Configurable<bool> doMCAssociation{"doMCAssociation", false, "If True, select mothers and daughters based on MC association"};
+
+    Configurable<int> pdgCodeMother{"pdgCodeMother", 22, "PDG Code for V0"};
+    Configurable<int> pdgCodeNeg{"pdgCodeNeg", 11, "PDG Code for Negative Track"};
+    Configurable<int> pdgCodePos{"pdgCodePos", -11, "PDG Code for Positive Track"};
+  
+  } MCAssociationOpts;
+
   // Axis
   // base properties
   ConfigurableAxis axisPt{"axisPt", {VARIABLE_WIDTH, 0.0f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 1.9f, 2.0f, 2.2f, 2.4f, 2.6f, 2.8f, 3.0f, 3.2f, 3.4f, 3.6f, 3.8f, 4.0f, 4.4f, 4.8f, 5.2f, 5.6f, 6.0f, 6.5f, 7.0f, 7.5f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 17.0f, 19.0f, 21.0f, 23.0f, 25.0f, 30.0f, 35.0f, 40.0f, 50.0f}, "pt axis for analysis"};
-  ConfigurableAxis axisPA{"axisPA", {200, 0.0f, 1.0f}, "Pointing angle"};
+  ConfigurableAxis axisPA{"axisPA", {200, 0.0f, 2.0f}, "Pointing angle"};
   ConfigurableAxis axisBDTScore{"axisBDTScore", {200, 0.0f, 1.0f}, "BDT Score"};
   ConfigurableAxis axisDCAz{"axisDCAz", {200, -50.0f, 50.0f}, "DCAz"};
   
-    void init(InitContext const&)
+  int v0GroupGlobalID = 0;
+  void init(InitContext const&)
   {
     histos.add("hDuplicateCount", "hDuplicateCount", kTH1F, {{50, -0.5f, 49.5f}});
     histos.add("hDuplicateCountType7", "hDuplicateCountType7", kTH1F, {{50, -0.5f, 49.5f}});
     histos.add("hDuplicateCountType7allTPConly", "hDuplicateCountType7allTPConly", kTH1F, {{50, -0.5f, 49.5f}});
 
-    histos.add("hPhotonPt", "hPhotonPt", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hPhotonPt_Duplicates", "hPhotonPt_Duplicates", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hPhotonPt_withRecoedMcCollision", "hPhotonPt_withRecoedMcCollision", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hPhotonPt_withCorrectCollisionCopy", "hPhotonPt_withCorrectCollisionCopy", kTH1F, {{200, 0.0f, 20.0f}});
+    histos.add("hPhotonPt", "hPhotonPt", kTH1F, {axisPt});
+    histos.add("hPhotonPt_Duplicates", "hPhotonPt_Duplicates", kTH1F, {axisPt});
+    histos.add("hPhotonPt_withRecoedMcCollision", "hPhotonPt_withRecoedMcCollision", kTH1F, {axisPt});
+    histos.add("hPhotonPt_withCorrectCollisionCopy", "hPhotonPt_withCorrectCollisionCopy", kTH1F, {axisPt});
 
-    histos.add("hPA_All", "hPA_All", kTH1F, {{100, 0.0f, 1.0f}});
-    histos.add("hPA_Correct", "hPA_Correct", kTH1F, {{100, 0.0f, 1.0f}});
+    histos.add("hPA_All", "hPA_All", kTH1F, {axisPA});
+    histos.add("hPA_Correct", "hPA_Correct", kTH1F, {axisPA});
+     
+    histos.add("hPAvsPt_All", "hPAvsPt_All", kTH2F, {axisPt, axisPA});
+    histos.add("hPAvsPt_Correct", "hPAvsPt_Correct", kTH2F, {axisPt, axisPA});
+    histos.add("hDCADaughtersvsPt_All", "hDCADaughtersvsPt_All", kTH2F, {axisPt, {100, 0.0f, 5.0f}});
+    histos.add("hDCADaughtersvsPt_Correct", "hDCADaughtersvsPt_Correct", kTH2F, {axisPt, {100, 0.0f, 5.0f}});
+    histos.add("hDCADaughters3DvsPt_All", "hDCADaughters3DvsPt_All", kTH2F, {axisPt, {100, 0.0f, 5.0f}});
+    histos.add("hDCADaughters3DvsPt_Correct", "hDCADaughters3DvsPt_Correct", kTH2F, {axisPt, {100, 0.0f, 5.0f}});
+    histos.add("hDCADaughtersXYvsPt_All", "hDCADaughtersXYvsPt_All", kTH2F, {axisPt, {100, 0.0f, 5.0f}});
+    histos.add("hDCADaughtersXYvsPt_Correct", "hDCADaughtersXYvsPt_Correct", kTH2F, {axisPt, {100, 0.0f, 5.0f}});
+    histos.add("hDCADaughtersZvsPt_All", "hDCADaughtersZvsPt_All", kTH2F, {axisPt, {100, 0.0f, 5.0f}});
+    histos.add("hDCADaughtersZvsPt_Correct", "hDCADaughtersZvsPt_Correct", kTH2F, {axisPt, {100, 0.0f, 5.0f}});
 
-    // 2D for <de-duplication criteria> vs pT
-    histos.add("hPAvsPt_All", "hPAvsPt_All", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 1.0f}});
-    histos.add("hPAvsPt_Correct", "hPAvsPt_Correct", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 1.0f}});
-    histos.add("hDCADaughtersvsPt_All", "hDCADaughtersvsPt_All", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
-    histos.add("hDCADaughtersvsPt_Correct", "hDCADaughtersvsPt_Correct", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
-    histos.add("hDCADaughters3DvsPt_All", "hDCADaughters3DvsPt_All", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
-    histos.add("hDCADaughters3DvsPt_Correct", "hDCADaughters3DvsPt_Correct", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
-    histos.add("hDCADaughtersXYvsPt_All", "hDCADaughtersXYvsPt_All", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
-    histos.add("hDCADaughtersXYvsPt_Correct", "hDCADaughtersXYvsPt_Correct", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
-    histos.add("hDCADaughtersZvsPt_All", "hDCADaughtersZvsPt_All", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
-    histos.add("hDCADaughtersZvsPt_Correct", "hDCADaughtersZvsPt_Correct", kTH2F, {{200, 0.0f, 20.0f}, {100, 0.0f, 5.0f}});
+    auto h3dPAVsPt = histos.add<TH3>("h3dPAVsPt", "h3dPAVsPt", kTH3F, {{2, -0.5f, 1.5f}, axisPA, axisPt});
+    h3dPAVsPt->GetXaxis()->SetBinLabel(1, "Wrong Association");
+    h3dPAVsPt->GetXaxis()->SetBinLabel(2, "Correct collision");
 
-    // winner-takes-all criteria spectra
-    histos.add("hCorrect_BestPA", "hCorrect_BestPA", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hCorrect_BestDCADau", "hCorrect_DCADau", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hCorrect_BestDCADau3D", "hCorrect_DCADau3D", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hCorrect_BestDCADauXY", "hCorrect_DCADauXY", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hCorrect_BestDCADauZ", "hCorrect_DCADauZ", kTH1F, {{200, 0.0f, 20.0f}});
-    histos.add("hCorrect_BestPAandDCADau3D", "hCorrect_BestPAandDCADau3D", kTH1F, {{200, 0.0f, 20.0f}});
+    // winner-takes-all criteria
+    histos.add("hCorrect_BestPA", "hCorrect_BestPA", kTH1F, {axisPt});
+    histos.add("hWrong_BestPA", "hWrong_BestPA", kTH1F, {axisPt});
+    histos.add("hCorrect_BestDCADau", "hCorrect_DCADau", kTH1F, {axisPt});
+    histos.add("hCorrect_BestDCADau3D", "hCorrect_DCADau3D", kTH1F, {axisPt});
+    histos.add("hCorrect_BestDCADauXY", "hCorrect_DCADauXY", kTH1F, {axisPt});
+    histos.add("hCorrect_BestDCADauZ", "hCorrect_DCADauZ", kTH1F, {axisPt});
+    histos.add("hCorrect_BestPAandDCADau3D", "hCorrect_BestPAandDCADau3D", kTH1F, {axisPt});
 
-    // Deduplication with Machine Learning    
-    auto h3dMLScoreVsPt_Gamma = histos.add<TH3>("h3dMLScoreVsPt_Gamma", "h3dMLScoreVsPt_Gamma", kTH3F, {{2, -0.5f, 1.5f}, axisBDTScore, axisPt});
-    h3dMLScoreVsPt_Gamma->GetXaxis()->SetBinLabel(1, "Wrong Association");
-    h3dMLScoreVsPt_Gamma->GetXaxis()->SetBinLabel(2, "Correct collision");
-
-    histos.add("h3dPAVsDCAzVsPt_Gamma", "h3dPAVsDCAzVsPt_Gamma", kTH3F, {axisPA, axisDCAz, axisPt});    
-    histos.add("h3dPAVsDCAzVsPt_Gamma_BadCollAssig", "h3dPAVsDCAzVsPt_Gamma_BadCollAssig", kTH3F, {axisPA, axisDCAz, axisPt});
+    // Deduplication with BDT    
+    histos.add("hMLScore", "hMLScore", kTH1F, {axisBDTScore});
+    histos.add("hCorrect_BDTScore", "hCorrect_BDTScore", kTH1F, {axisPt});
+    histos.add("hWrong_BDTScore", "hWrong_BDTScore", kTH1F, {axisPt});
+    auto h3dMLScoreVsPt = histos.add<TH3>("h3dMLScoreVsPt", "h3dMLScoreVsPt", kTH3F, {{2, -0.5f, 1.5f}, axisBDTScore, axisPt});
+    h3dMLScoreVsPt->GetXaxis()->SetBinLabel(1, "Wrong Association");
+    h3dMLScoreVsPt->GetXaxis()->SetBinLabel(2, "Correct collision");
     
     ccdb->setURL(ccdbConfigurations.ccdburl);
     ccdb->setCaching(true);
@@ -212,7 +232,6 @@ struct v0assoqa {
     straHelper.cascadeselections.lambdaMassWindow = cascadeBuilderOpts.lambdaMassWindow;
     straHelper.cascadeselections.maxDaughterEta = cascadeBuilderOpts.maxDaughterEta;
         
-    
     if (PredictV0Association) {
       if (loadModelsFromCCDB) { 
         // Retrieve the model from CCDB
@@ -282,7 +301,7 @@ struct v0assoqa {
   
   //_______________________________________________________________________
   template <typename TMCParticles>
-  int findMotherFromLabels(int const& p1, int const& p2, const int expected_pdg1, const int expected_pdg2, const int expected_mother_pdg, TMCParticles const& mcparticles)
+  int findMotherFromLabels(int const& p1, int const& p2, TMCParticles const& mcparticles)
   {
     // encompasses a simple check for labels existing
     if (p1 < 0 || p2 < 0) {
@@ -290,16 +309,16 @@ struct v0assoqa {
     }
     auto mcParticle1 = mcparticles.rawIteratorAt(p1);
     auto mcParticle2 = mcparticles.rawIteratorAt(p2);
-    return (findMother(mcParticle1, mcParticle2, expected_pdg1, expected_pdg2, expected_mother_pdg, mcparticles));
+    return (findMother(mcParticle1, mcParticle2, mcparticles));
   }
 
   //_______________________________________________________________________
   template <typename TMCParticle1, typename TMCParticle2, typename TMCParticles>
-  int findMother(TMCParticle1 const& p1, TMCParticle2 const& p2, const int expected_pdg1, const int expected_pdg2, const int expected_mother_pdg, TMCParticles const& mcparticles)
+  int findMother(TMCParticle1 const& p1, TMCParticle2 const& p2, TMCParticles const& mcparticles)
   {
     if (p1.globalIndex() == p2.globalIndex())
       return -1;
-    if (p1.pdgCode() != expected_pdg1 || p2.pdgCode() != expected_pdg2)
+    if ((p1.pdgCode() != MCAssociationOpts.pdgCodePos || p2.pdgCode() != MCAssociationOpts.pdgCodeNeg) && MCAssociationOpts.doMCAssociation)
       return -1;
     if (!p1.has_mothers() || !p2.has_mothers())
       return -1;
@@ -308,11 +327,12 @@ struct v0assoqa {
     auto mother1 = mcparticles.iteratorAt(motherid1);
     int mother1_pdg = mother1.pdgCode();
     int motherid2 = p2.mothersIds()[0];
-    auto mother2 = mcparticles.iteratorAt(motherid2);
-    int mother2_pdg = mother2.pdgCode();
 
-    if (motherid1 != motherid2 || mother1_pdg != mother2_pdg || mother1_pdg != expected_mother_pdg)
+    if (motherid1 != motherid2) 
       return -1;
+
+    if((mother1_pdg != MCAssociationOpts.pdgCodeMother) && MCAssociationOpts.doMCAssociation)
+      return -1; // not the expected mother
 
     return motherid1;
   }
@@ -328,40 +348,164 @@ struct v0assoqa {
     float v0NegTrackTime;
     float v0DauDCAxy;
     float v0DauDCAz;
+    float v0DCAToPVxy;
+    float v0DCAToPVz;
     float v0MCpT;
-    int v0CollIdx;    
+    float v0PhotonMass; 
+    int v0GroupGlobalID;    
     bool v0IsCorrectlyAssociated;
+    bool v0hasCorrectCollisionCopy;
+    int v0PDGCode;
     bool isBuildOk;
   };
+
+  // Simple function to sort values in a vector
+  vector<int> rankSort(const vector<float>& v_temp, bool descending = false) {
+    vector<pair<float, size_t>> v_sort(v_temp.size());
+
+    // Pair each value with its original index
+    for (size_t i = 0U; i < v_temp.size(); ++i) {
+        v_sort[i] = make_pair(v_temp[i], i);
+    }
+
+    // Sort by value - ascending: lowest gets rank 1, descending: highest gets rank 1
+
+    if (descending) {
+        std::sort(v_sort.begin(), v_sort.end(), [](const auto& a, const auto& b) {
+            return a.first > b.first;
+        });
+    } else {
+        std::sort(v_sort.begin(), v_sort.end(), [](const auto& a, const auto& b) {
+            return a.first < b.first;
+        });
+    }
+
+    pair<float, size_t> rank_tracker = make_pair(std::numeric_limits<float>::quiet_NaN(), 0);
+    vector<int> result(v_temp.size());
+
+    for (size_t i = 0U; i < v_sort.size(); ++i) {
+        // Only update rank if value is different from previous
+        if (v_sort[i].first != rank_tracker.first) {
+            rank_tracker = make_pair(v_sort[i].first, i + 1);  // +1 for 1-based rank
+        }
+        result[v_sort[i].second] = rank_tracker.second;  // assign rank to original index
+    }
+
+    return result;
+  }
 
   //_______________________________________________________________________
   // Process duplicated photons
   void processDuplicates(std::vector<o2::pwglf::v0candidate> v0duplicates, std::vector<V0DuplicateExtra> V0DuplicateExtras, std::vector<o2::pwglf::V0group> V0Grouped, size_t iV0)
   {
+    float bestBDTScore = -1;
+    bool bestBDTScoreCorrect = false;
+
+    // Defining context variables
+    int NDuplicates = 0;
+    
     float AvgPA = 0.0f;    
     float AvgZ = 0.0f;    
-    float AvgDCAxy = 0.0f;
-    float AvgDCAz = 0.0f;
+    float AvgDCADauxy = 0.0f;
+    float AvgDCADauz = 0.0f;
+    float AvgV0DCAxy = 0.0f;
+    float AvgV0DCAz = 0.0f;
+    float MinPA = 999.f;
+    float MaxPA = -999.f;
+    float MinZ = 999.f;
+    float MaxZ = -999.f;
+    float MinDCADauxy = 999.f;
+    float MaxDCADauxy = -999.f;
+    float MinDCADauz = 999.f;
+    float MaxDCADauz = -999.f;
+    float MinV0DCAxy = 999.f;
+    float MaxV0DCAxy = -999.f;
+    float MinV0DCAz = 999.f;
+    float MaxV0DCAz = -999.f;
 
+    // Containers for ranking
+    std::vector<float> paVec(V0Grouped[iV0].collisionIds.size(), 999.f);
+    std::vector<float> v0zVec(V0Grouped[iV0].collisionIds.size(), 999.f);
+    std::vector<float> DCADauxyVec(V0Grouped[iV0].collisionIds.size(), 999.f);
+    std::vector<float> DCADauzVec(V0Grouped[iV0].collisionIds.size(), 999.f);
+    std::vector<float> v0DCAxyVec(V0Grouped[iV0].collisionIds.size(), 999.f);
+    std::vector<float> v0DCAzVec(V0Grouped[iV0].collisionIds.size(), 999.f);
+    
     for (size_t ic = 0; ic < V0Grouped[iV0].collisionIds.size(); ic++) {    
       if (!V0DuplicateExtras[ic].isBuildOk && selectBuiltOnly) {
         continue; // skip not built V0s
-      }  
-      AvgPA += v0duplicates[ic].pointingAngle;
-      AvgDCAxy += V0DuplicateExtras[ic].v0DauDCAxy;
-      AvgDCAz += V0DuplicateExtras[ic].v0DauDCAz;
+      }
+
+      if (V0DuplicateExtras[ic].v0PhotonMass>v0BuilderOpts.PhotonMaxMass)
+        continue; // skip anything that doesn't look like a photon
+
+      // TODO: include optional pT selection
+      
+      float pa = v0duplicates[ic].pointingAngle;
+      float z = std::abs(v0duplicates[ic].position[2]);
+      float dcaDauxy = std::abs(V0DuplicateExtras[ic].v0DauDCAxy);
+      float dcaDauz = std::abs(V0DuplicateExtras[ic].v0DauDCAz);
+      float dcaToPVxy = std::abs(V0DuplicateExtras[ic].v0DCAToPVxy);
+      float dcaToPVz = std::abs(V0DuplicateExtras[ic].v0DCAToPVz);
+      
+      AvgPA += pa;
+      AvgZ += z;
+      AvgDCADauxy += dcaDauxy;
+      AvgDCADauz += dcaDauz;
+      AvgV0DCAxy += dcaToPVxy;
+      AvgV0DCAz += dcaToPVz;
+
+      if (pa < MinPA) MinPA = pa;
+      if (pa > MaxPA) MaxPA = pa;
+      if (z < MinZ) MinZ = z;
+      if (z > MaxZ) MaxZ = z;
+      if (dcaDauxy < MinDCADauxy) MinDCADauxy = dcaDauxy;
+      if (dcaDauxy > MaxDCADauxy) MaxDCADauxy = dcaDauxy;
+      if (dcaDauz < MinDCADauz) MinDCADauz = dcaDauz;
+      if (dcaDauz > MaxDCADauz) MaxDCADauz = dcaDauz;
+      if (dcaToPVxy < MinV0DCAxy) MinV0DCAxy = dcaToPVxy;
+      if (dcaToPVxy > MaxV0DCAxy) MaxV0DCAxy = dcaToPVxy;
+      if (dcaToPVz < MinV0DCAz) MinV0DCAz = dcaToPVz;
+      if (dcaToPVz > MaxV0DCAz) MaxV0DCAz = dcaToPVz;
+      
+      // Filling vector for ranking
+      paVec[ic] = pa;
+      v0zVec[ic] = z;
+      DCADauxyVec[ic] = dcaDauxy;
+      DCADauzVec[ic] = dcaDauz;
+      v0DCAxyVec[ic] = dcaToPVxy;
+      v0DCAzVec[ic] = dcaToPVz;
+      
+      NDuplicates++;
     }
 
-    AvgPA /= V0Grouped[iV0].collisionIds.size();
-    AvgDCAxy /= V0Grouped[iV0].collisionIds.size();
-    AvgDCAz /= V0Grouped[iV0].collisionIds.size();
+    // Finalize averages
+    if (NDuplicates > 0) {
+      AvgPA /= NDuplicates;
+      AvgZ /= NDuplicates;
+      AvgDCADauxy /= NDuplicates;
+      AvgDCADauz /= NDuplicates;
+      AvgV0DCAxy /= NDuplicates;
+      AvgV0DCAz /= NDuplicates;
+    }
+
+    // Get vector of ranks
+    std::vector<int> paRanks = rankSort(paVec, false);
+    std::vector<int> v0zRanks = rankSort(v0zVec, false);
+    std::vector<int> dcaDauxyRanks = rankSort(DCADauxyVec, false);
+    std::vector<int> dcaDauzRanks = rankSort(DCADauzVec, false);
+    std::vector<int> v0DCAxyRanks = rankSort(v0DCAxyVec, false);
+    std::vector<int> v0DCAzRanks = rankSort(v0DCAzVec, false);
 
     // fill duplicates table
-    for (size_t ic = 0; ic < V0Grouped[iV0].collisionIds.size(); ic++) {
-                
+    for (size_t ic = 0; ic < V0Grouped[iV0].collisionIds.size(); ic++) {                
       if (!V0DuplicateExtras[ic].isBuildOk && selectBuiltOnly) {
         continue; // skip not built V0s
       }
+      if (V0DuplicateExtras[ic].v0PhotonMass>v0BuilderOpts.PhotonMaxMass)
+        continue; // skip anything that doesn't look like a photon
+
+      // TODO: include optional pT selection
 
       float pxpos = v0duplicates[ic].positiveMomentum[0]; 
       float pypos = v0duplicates[ic].positiveMomentum[1];
@@ -374,20 +518,22 @@ struct v0assoqa {
       float v0py = pypos + pyneg;
       float v0pz = pzpos + pzneg;
 
-      float v0Z = v0duplicates[ic].position[2];
-      float v0DCADau = v0duplicates[ic].daughterDCA;
-      float v0DCAxy = V0DuplicateExtras[ic].v0DauDCAxy;
-      float v0DCAz = V0DuplicateExtras[ic].v0DauDCAz;
+      float v0Z = std::abs(v0duplicates[ic].position[2]);
+      float v0DCADau = std::abs(v0duplicates[ic].daughterDCA);
+      float v0DauDCAxy = std::abs(V0DuplicateExtras[ic].v0DauDCAxy);
+      float v0DauDCAz = std::abs(V0DuplicateExtras[ic].v0DauDCAz);
       float v0PA = v0duplicates[ic].pointingAngle;
       float v0Radius = RecoDecay::sqrtSumOfSquares(v0duplicates[ic].position[0], v0duplicates[ic].position[1]);
-      float v0PosDCAToPV = v0duplicates[ic].positiveDCAxy;
-      float v0NegDCAToPV = v0duplicates[ic].negativeDCAxy;
+      float v0PosDCAToPV = std::abs(v0duplicates[ic].positiveDCAxy);
+      float v0NegDCAToPV = std::abs(v0duplicates[ic].negativeDCAxy);
+      float v0DCAToPVxy = std::abs(V0DuplicateExtras[ic].v0DCAToPVxy);
+      float v0DCAToPVz = std::abs(V0DuplicateExtras[ic].v0DCAToPVz);
       float v0Phi = RecoDecay::phi(v0px, v0py);
       float collX = V0DuplicateExtras[ic].collX;
       float collY = V0DuplicateExtras[ic].collY;
       float collZ = V0DuplicateExtras[ic].collZ;      
 
-      float v0PhotonMass = RecoDecay::m(std::array{std::array{pxpos, pypos, pzpos}, std::array{pxneg, pyneg, pzneg}}, std::array{o2::constants::physics::MassElectron, o2::constants::physics::MassElectron});
+      float v0PhotonMass = V0DuplicateExtras[ic].v0PhotonMass;
       float v0pt = RecoDecay::sqrtSumOfSquares(v0px, v0py);
       float v0mcpt = V0DuplicateExtras[ic].v0MCpT;
       
@@ -397,40 +543,59 @@ struct v0assoqa {
       float v0PosTrackTime = V0DuplicateExtras[ic].v0PosTrackTime;
       float v0NegTrackTime = V0DuplicateExtras[ic].v0NegTrackTime;
       float collTime = V0DuplicateExtras[ic].collTime;
-      int v0CollIdx = V0DuplicateExtras[ic].v0CollIdx;
+    
+      int PARank = paRanks[ic];
+      int ZRank = v0zRanks[ic];
+      int DCADauxyRank = dcaDauxyRanks[ic];
+      int DCADauzRank = dcaDauzRanks[ic];
+      int v0DCAxyRank = v0DCAxyRanks[ic];
+      int v0DCAzRank = v0DCAzRanks[ic];
+
+      // Auxiliary variables
+      int v0GroupID = V0DuplicateExtras[ic].v0GroupGlobalID;
+      int PDGCode = V0DuplicateExtras[ic].v0PDGCode;
       bool v0IsCorrectlyAssociated = V0DuplicateExtras[ic].v0IsCorrectlyAssociated;
 
       float BDTScore = -1.0f;
       // Simple test of deduplication mode 4
       if (PredictV0Association) {
-
         // Define input features for the BDT
-        std::vector<float> inputFeatures{v0Z, v0DCADau, v0DCAxy, v0DCAz, v0PA, v0Radius,
-                                           v0PosDCAToPV, v0NegDCAToPV, v0Phi, collX, collY,
-                                           collZ, AvgDCAxy, AvgDCAz, AvgPA, AvgZ,
-                                           v0pt, v0pz, v0PosTrackTime, v0NegTrackTime, collTime};
+        std::vector<float> inputFeatures{v0DCAToPVz, v0PA, v0Z, static_cast<float>(PARank), static_cast<float>(NDuplicates), 
+                                         AvgPA, static_cast<float>(ZRank), v0Radius, MaxZ, MinPA, static_cast<float>(v0DCAzRank), v0Eta};
 
         float* BDTProbability = deduplication_bdt.evalModel(inputFeatures);
         BDTScore = BDTProbability[1];
         
-        histos.fill(HIST("h3dMLScoreVsPt_Gamma"), v0IsCorrectlyAssociated, BDTScore, v0mcpt);        
-        histos.fill(HIST("h3dPAVsDCAzVsPt_Gamma"), v0PA, v0DCAz, v0mcpt);
-      
-        // Optionally select on BDT score
-        if (BDTthreshold > 0 && BDTScore >= BDTthreshold) {          
-          if (!v0IsCorrectlyAssociated) {            
-            histos.fill(HIST("h3dPAVsDCAzVsPt_Gamma_BadCollAssig"), v0PA, v0DCAz, v0mcpt);
-          }
+        // Fill histograms for deduplication using selections
+        histos.fill(HIST("hMLScore"), BDTScore);        
+        histos.fill(HIST("h3dMLScoreVsPt"), v0IsCorrectlyAssociated, BDTScore, v0mcpt);        
+
+        // The winner takes it all criteria 
+        if (BDTScore > bestBDTScore) {
+          bestBDTScore = BDTScore;
+          bestBDTScoreCorrect = v0IsCorrectlyAssociated;
         }
       }
-
+      
       // fill table
       if (fillDuplicatesTable) 
-        photonDuplicates(v0Z, v0DCADau, v0DCAxy, v0DCAz, v0PA, v0Radius, v0PosDCAToPV, v0NegDCAToPV, v0Phi,
-                       collX, collY, collZ, AvgDCAxy, AvgDCAz, AvgPA, AvgZ,
+        photonDuplicates(v0Z, v0DCADau, v0DauDCAxy, v0DauDCAz, v0PA, v0Radius, v0PosDCAToPV, v0NegDCAToPV, v0DCAToPVxy, v0DCAToPVz, v0Phi,
+                       collX, collY, collZ, AvgDCADauxy, AvgDCADauz, AvgPA, AvgZ,
+                       MinPA, MaxPA, MinZ, MaxZ, MinDCADauxy, MaxDCADauxy, MinDCADauz, MaxDCADauz,
+                       MinV0DCAxy, MaxV0DCAxy, MinV0DCAz, MaxV0DCAz,
+                       PARank, ZRank, DCADauxyRank, DCADauzRank, v0DCAxyRank, v0DCAzRank,
                        v0PhotonMass, v0pt, v0px, v0py, v0pz, v0Y, v0Eta, 
-                       v0PosTrackTime, v0NegTrackTime, collTime,
-                       v0CollIdx, v0IsCorrectlyAssociated);
+                       v0PosTrackTime, v0NegTrackTime, collTime, NDuplicates,
+                       v0GroupID, PDGCode, v0IsCorrectlyAssociated);
+    }  // end duplicate loop
+
+    if (V0DuplicateExtras[0].v0hasCorrectCollisionCopy && PredictV0Association){ 
+      if (bestBDTScoreCorrect) {
+        histos.fill(HIST("hCorrect_BDTScore"), V0DuplicateExtras[0].v0MCpT);
+      }
+      else{
+        histos.fill(HIST("hWrong_BDTScore"), V0DuplicateExtras[0].v0MCpT);
+      }
     }
   }
 
@@ -463,14 +628,19 @@ struct v0assoqa {
       auto nTrack = tracks.rawIteratorAt(v0tableGrouped[iV0].negTrackId);
       bool pTrackTPCOnly = (pTrack.hasTPC() && !pTrack.hasITS() && !pTrack.hasTRD() && !pTrack.hasTOF());
       bool nTrackTPCOnly = (nTrack.hasTPC() && !nTrack.hasITS() && !nTrack.hasTRD() && !nTrack.hasTOF());
-
+    
+      // don't run analysis if no track is TPC only
+      if (!pTrackTPCOnly && !nTrackTPCOnly) {
+        continue;
+      }
+      
       if (v0tableGrouped[iV0].v0Type == 7 && pTrackTPCOnly && nTrackTPCOnly) {
         histos.fill(HIST("hDuplicateCountType7allTPConly"), v0tableGrouped[iV0].collisionIds.size());
       }
 
       int pTrackLabel = pTrack.mcParticleId();
       int nTrackLabel = nTrack.mcParticleId();
-      int v0Label = findMotherFromLabels(pTrackLabel, nTrackLabel, -11, 11, 22, mcParticles);
+      int v0Label = findMotherFromLabels(pTrackLabel, nTrackLabel, mcParticles);
       int correctMcCollision = -1;
       if (v0Label > -1) {
         // this mc particle exists and is a gamma
@@ -559,9 +729,6 @@ struct v0assoqa {
           // process candidate with helper
           bool buildOK = straHelper.buildV0Candidate<false>(v0tableGrouped[iV0].collisionIds[ic], collision.posX(), collision.posY(), collision.posZ(), pTrack, nTrack, posTrackPar, negTrackPar, true, false, true);                              
           
-          // simple duplicate accounting
-          histos.fill(HIST("hPhotonPt_Duplicates"), mcV0.pt());
-
           float daughterDCA3D = std::hypot(
             straHelper.v0.positivePosition[0] - straHelper.v0.negativePosition[0],
             straHelper.v0.positivePosition[1] - straHelper.v0.negativePosition[1],
@@ -576,6 +743,14 @@ struct v0assoqa {
             daughterDCA3D = daughterDCAXY = daughterDCAZ = 1e+6;
           }
 
+          float pxpos = straHelper.v0.positiveMomentum[0]; 
+          float pypos = straHelper.v0.positiveMomentum[1];
+          float pzpos = straHelper.v0.positiveMomentum[2];
+          float pxneg = straHelper.v0.negativeMomentum[0];
+          float pyneg = straHelper.v0.negativeMomentum[1];
+          float pzneg = straHelper.v0.negativeMomentum[2];
+          float v0PhotonMass = RecoDecay::m(std::array{std::array{pxpos, pypos, pzpos}, std::array{pxneg, pyneg, pzneg}}, std::array{o2::constants::physics::MassElectron, o2::constants::physics::MassElectron});
+
           // V0 Duplicates extras
           V0DuplicateExtra v0DuplicateInfo;
           v0DuplicateInfo.collX = collision.posX();
@@ -586,18 +761,35 @@ struct v0assoqa {
           v0DuplicateInfo.v0NegTrackTime = nTrack.trackTime();
           v0DuplicateInfo.v0DauDCAxy = daughterDCAXY;
           v0DuplicateInfo.v0DauDCAz = daughterDCAZ;
+          v0DuplicateInfo.v0DCAToPVxy = straHelper.v0.v0DCAToPVxy;
+          v0DuplicateInfo.v0DCAToPVz = straHelper.v0.v0DCAToPVz;
           v0DuplicateInfo.v0MCpT = mcV0.pt();
-          v0DuplicateInfo.v0CollIdx = v0tableGrouped[iV0].collisionIds[ic];
+          v0DuplicateInfo.v0PhotonMass = v0PhotonMass;
+          v0DuplicateInfo.v0GroupGlobalID = v0GroupGlobalID;
           v0DuplicateInfo.v0IsCorrectlyAssociated = correctlyAssociated;
+          v0DuplicateInfo.v0hasCorrectCollisionCopy = hasCorrectCollisionCopy;          
+          v0DuplicateInfo.v0PDGCode = mcV0.pdgCode();
           v0DuplicateInfo.isBuildOk = buildOK;
-          
+  
           // store check for correct association + saving duplicates info
           v0duplicatesCorrectlyAssociated.push_back(correctlyAssociated);
           v0duplicates.push_back(straHelper.v0);
           V0DuplicateExtras.push_back(v0DuplicateInfo);
 
+          if (!buildOK && selectBuiltOnly) 
+            continue; // skip not built V0s
+          
+          if (v0PhotonMass > v0BuilderOpts.PhotonMaxMass)
+            continue; // skip anything that doesn't look like a photon
+
+          // TODO: include optional pT selection
+          
+          // simple duplicate accounting
+          histos.fill(HIST("hPhotonPt_Duplicates"), mcV0.pt());
+
           histos.fill(HIST("hPA_All"), straHelper.v0.pointingAngle);
           histos.fill(HIST("hPAvsPt_All"), mcV0.pt(), straHelper.v0.pointingAngle);
+          histos.fill(HIST("h3dPAVsPt"), correctlyAssociated, straHelper.v0.pointingAngle, mcV0.pt());        
           histos.fill(HIST("hDCADaughtersvsPt_All"), mcV0.pt(), straHelper.v0.daughterDCA);
           histos.fill(HIST("hDCADaughters3DvsPt_All"), mcV0.pt(), daughterDCA3D);
           histos.fill(HIST("hDCADaughtersXYvsPt_All"), mcV0.pt(), daughterDCAXY);
@@ -640,6 +832,9 @@ struct v0assoqa {
           if (bestPointingAngleCorrect) {
             histos.fill(HIST("hCorrect_BestPA"), mcV0.pt());
           }
+          else{
+            histos.fill(HIST("hWrong_BestPA"), mcV0.pt());
+          }
           if (bestDCADaughtersCorrect) {
             histos.fill(HIST("hCorrect_BestDCADau"), mcV0.pt());
           }
@@ -656,8 +851,9 @@ struct v0assoqa {
             histos.fill(HIST("hCorrect_BestPAandDCADau3D"), mcV0.pt());
           }
         }
-
+        
         if (fillDuplicatesTable || PredictV0Association) processDuplicates(v0duplicates, V0DuplicateExtras, v0tableGrouped, iV0);
+        v0GroupGlobalID++; // Update the global counter, please 
 
         // printout for inspection
         // TString cosPAString = "";
