@@ -247,6 +247,112 @@ DECLARE_SOA_TABLE(CascXiMLScores, "AOD", "CASCXIMLSCORES",
 DECLARE_SOA_TABLE(CascOmMLScores, "AOD", "CASCOMMLSCORES",
                   CascMLSelection::OmegaBDTScore);
 
+        
+namespace PhotonDuplicates
+{
+DECLARE_SOA_COLUMN(V0z, v0z, float);
+DECLARE_SOA_COLUMN(V0DCADau, v0DCADau, float);
+DECLARE_SOA_COLUMN(V0DCADauxy, v0DCADauxy, float);
+DECLARE_SOA_COLUMN(V0DCADauz, v0DCADauz, float);
+DECLARE_SOA_COLUMN(V0PA, v0PA, float);
+DECLARE_SOA_COLUMN(V0Radius, v0Radius, float);
+DECLARE_SOA_COLUMN(V0PosDCAToPV, v0PosDCAToPV, float);
+DECLARE_SOA_COLUMN(V0NegDCAToPV, v0NegDCAToPV, float);
+DECLARE_SOA_COLUMN(V0DCAToPVxy, v0DCAToPVxy, float);
+DECLARE_SOA_COLUMN(V0DCAToPVz, v0DCAToPVz, float);
+DECLARE_SOA_COLUMN(V0Phi, v0Phi, float);
+DECLARE_SOA_COLUMN(V0Collx, v0Collx, float);
+DECLARE_SOA_COLUMN(V0Colly, v0Colly, float);
+DECLARE_SOA_COLUMN(V0Collz, v0Collz, float);
+DECLARE_SOA_COLUMN(V0AvgDCADauxy, v0AvgDCADauxy, float);
+DECLARE_SOA_COLUMN(V0AvgDCADauz, v0AvgDCADauz, float);
+DECLARE_SOA_COLUMN(V0AvgPA, v0AvgPA, float);
+DECLARE_SOA_COLUMN(V0Avgz, v0Avgz, float);
+DECLARE_SOA_COLUMN(V0MinPA, v0MinPA, float);
+DECLARE_SOA_COLUMN(V0MaxPA, v0MaxPA, float);
+DECLARE_SOA_COLUMN(V0MinZ, v0MinZ, float);
+DECLARE_SOA_COLUMN(V0MaxZ, v0MaxZ, float);
+DECLARE_SOA_COLUMN(V0MinDCADauxy, v0MinDCADauxy, float);
+DECLARE_SOA_COLUMN(V0MaxDCADauxy, v0MaxDCADauxy, float);
+DECLARE_SOA_COLUMN(V0MinDCADauz, v0MinDCADauz, float);
+DECLARE_SOA_COLUMN(V0MaxDCADauz, v0MaxDCADauz, float);
+DECLARE_SOA_COLUMN(V0MinV0DCAxy, v0MinV0DCAxy, float);
+DECLARE_SOA_COLUMN(V0MaxV0DCAxy, v0MaxV0DCAxy, float);
+DECLARE_SOA_COLUMN(V0MinV0DCAz, v0MinV0DCAz, float);
+DECLARE_SOA_COLUMN(V0MaxV0DCAz, v0MaxV0DCAz, float);
+DECLARE_SOA_COLUMN(V0PARank, v0PARank, int);
+DECLARE_SOA_COLUMN(V0ZRank, v0ZRank, int);
+DECLARE_SOA_COLUMN(V0DCADauxyRank, v0DCADauxyRank, int);
+DECLARE_SOA_COLUMN(V0DCADauzRank, v0DCADauzRank, int);
+DECLARE_SOA_COLUMN(V0DCAxyRank, v0DCAxyRank, int);
+DECLARE_SOA_COLUMN(V0DCAzRank, v0DCAzRank, int);
+DECLARE_SOA_COLUMN(V0PhotonMass, v0PhotonMass, float);
+DECLARE_SOA_COLUMN(V0pt, v0pt, float);
+DECLARE_SOA_COLUMN(V0px, v0px, float);
+DECLARE_SOA_COLUMN(V0py, v0py, float);
+DECLARE_SOA_COLUMN(V0pz, v0pz, float);
+DECLARE_SOA_COLUMN(V0Y, v0Y, float);
+DECLARE_SOA_COLUMN(V0Eta, v0Eta, float);
+DECLARE_SOA_COLUMN(V0PosTrackTime, v0PosTrackTime, float);
+DECLARE_SOA_COLUMN(V0NegTrackTime, v0NegTrackTime, float);
+DECLARE_SOA_COLUMN(V0CollTime, v0CollTime, float);
+DECLARE_SOA_COLUMN(V0NDuplicates, v0NDuplicates, int);
+DECLARE_SOA_COLUMN(V0GroupID, v0GroupID, int);
+DECLARE_SOA_COLUMN(V0PDGCode, v0PDGCode, int);
+DECLARE_SOA_COLUMN(IsCorrectlyAssoc, isCorrectlyAssoc, bool);
+} // namespace PhotonDuplicates
+
+DECLARE_SOA_TABLE(V0Duplicates, "AOD", "V0DUPLICATES",
+                  PhotonDuplicates::V0z,
+                  PhotonDuplicates::V0DCADau,
+                  PhotonDuplicates::V0DCADauxy,
+                  PhotonDuplicates::V0DCADauz,
+                  PhotonDuplicates::V0PA,
+                  PhotonDuplicates::V0Radius,                  
+                  PhotonDuplicates::V0PosDCAToPV,
+                  PhotonDuplicates::V0NegDCAToPV,
+                  PhotonDuplicates::V0DCAToPVxy,
+                  PhotonDuplicates::V0DCAToPVz,
+                  PhotonDuplicates::V0Phi,                  
+                  PhotonDuplicates::V0Collx,
+                  PhotonDuplicates::V0Colly,
+                  PhotonDuplicates::V0Collz,
+                  PhotonDuplicates::V0AvgDCADauxy,
+                  PhotonDuplicates::V0AvgDCADauz,
+                  PhotonDuplicates::V0AvgPA,
+                  PhotonDuplicates::V0Avgz,
+                  PhotonDuplicates::V0MinPA,
+                  PhotonDuplicates::V0MaxPA,
+                  PhotonDuplicates::V0MinZ,
+                  PhotonDuplicates::V0MaxZ,
+                  PhotonDuplicates::V0MinDCADauxy,
+                  PhotonDuplicates::V0MaxDCADauxy,
+                  PhotonDuplicates::V0MinDCADauz,
+                  PhotonDuplicates::V0MaxDCADauz,
+                  PhotonDuplicates::V0MinV0DCAxy,
+                  PhotonDuplicates::V0MaxV0DCAxy,
+                  PhotonDuplicates::V0MinV0DCAz,
+                  PhotonDuplicates::V0MaxV0DCAz,
+                  PhotonDuplicates::V0PARank,
+                  PhotonDuplicates::V0ZRank,
+                  PhotonDuplicates::V0DCADauxyRank,
+                  PhotonDuplicates::V0DCADauzRank,
+                  PhotonDuplicates::V0DCAxyRank,
+                  PhotonDuplicates::V0DCAzRank,
+                  PhotonDuplicates::V0PhotonMass,
+                  PhotonDuplicates::V0pt,
+                  PhotonDuplicates::V0px,
+                  PhotonDuplicates::V0py,
+                  PhotonDuplicates::V0pz,
+                  PhotonDuplicates::V0Y,
+                  PhotonDuplicates::V0Eta,                  
+                  PhotonDuplicates::V0PosTrackTime,
+                  PhotonDuplicates::V0NegTrackTime,
+                  PhotonDuplicates::V0CollTime, 
+                  PhotonDuplicates::V0NDuplicates,                  
+                  PhotonDuplicates::V0GroupID,
+                  PhotonDuplicates::V0PDGCode,                                    
+                  PhotonDuplicates::IsCorrectlyAssoc);            
 } // namespace o2::aod
 
 #endif // PWGLF_DATAMODEL_LFSTRANGENESSMLTABLES_H_

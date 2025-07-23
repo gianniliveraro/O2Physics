@@ -48,9 +48,12 @@
 #include "DataFormatsParameters/GRPObject.h"
 #include "DataFormatsParameters/GRPMagField.h"
 #include "Common/Core/TPCVDriftManager.h"
+#include "Tools/ML/MlResponse.h"
+#include "Tools/ML/model.h"
 
 using namespace o2;
 using namespace o2::framework;
+using namespace o2::ml;
 
 static constexpr int nParameters = 1;
 static const std::vector<std::string> tableNames{
@@ -155,6 +158,9 @@ using TracksExtraWithPID = soa::Join<aod::TracksExtra, aod::pidTPCFullEl, aod::p
 struct StrangenessBuilder {
   // helper object
   o2::pwglf::strangenessBuilderHelper straHelper;
+
+  // ML model  
+  o2::ml::OnnxModel deduplication_bdt; 
 
   // table index : match order above
   enum tableIndex { kV0Indices = 0,
@@ -291,9 +297,35 @@ struct StrangenessBuilder {
     Configurable<std::string> geoPath{"geoPath", "GLO/Config/GeometryAligned", "Path of the geometry file"};
   } ccdbConfigurations;
 
-  // first order deduplication implementation
-  // more algorithms to be added as necessary
-  Configurable<int> deduplicationAlgorithm{"deduplicationAlgorithm", 1, "0: disabled; 1: best pointing angle wins; 2: best DCA daughters wins; 3: best pointing and best DCA wins"};
+  // ML options
+  std::map<std::string, std::string> metadata;
+
+  struct : ConfigurableGroup {
+    std::string prefix = "DeduplicationOpts";
+    
+    Configurable<int> deduplicationAlgorithm{"deduplicationAlgorithm", 1,
+                                              "0: disabled;" 
+                                              "1: best pointing angle wins;" 
+                                              "2: best DCA daughters wins;" 
+                                              "3: best pointing and best DCA wins;"
+                                              "4: best BDT score wins;"
+                                              "5: selects on PA (not a winner takes it all approach!);"
+                                              "6: selects on BDT score (not a winner takes it all approach!)"};
+
+    // BDT settings                                          
+    Configurable<std::string> ccdbUrl{"ccdb-url", "http://alice-ccdb.cern.ch", "url of the ccdb repository"};
+    Configurable<std::string> BDTLocalPath{"BDTLocalPath", "Deduplication_BDTModel.onnx", "(std::string) Path to the local .onnx file."};
+    Configurable<std::string> BDTPathCCDB{"BDTPathCCDB", "Users/g/gsetouel/MLModels2", "Path on CCDB"};
+    Configurable<int64_t> timestampCCDB{"timestampCCDB", -1, "timestamp of the ONNX file for ML model used to query in CCDB.  Exceptions: > 0 for the specific timestamp, 0 gets the run dependent timestamp"};
+    Configurable<bool> loadModelsFromCCDB{"loadModelsFromCCDB", false, "Flag to enable or disable the loading of models from CCDB"};
+    Configurable<bool> enableOptimizations{"enableOptimizations", false, "Enables the ONNX extended model-optimization: sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED)"};    
+    
+    // Selection based duplicates removal
+    Configurable<float> PAthreshold{"PAthreshold", 0.02, "PA cut to remove duplicates."};
+    Configurable<float> BDTthreshold{"BDTthreshold", 0.7, "BDT score cut to remove duplicates."};
+    
+  } DeduplicationOpts;
+
 
   // V0 buffer for V0s used in cascades: master switch
   // exchanges CPU (generate V0s again) with memory (save pre-generated V0s)
@@ -515,6 +547,15 @@ struct StrangenessBuilder {
     int mcParticleBachelor;
   };
   mcCascinfo thisCascInfo;
+  //*+-+*+-+*+-+*+-+*+-+*+-+*+-+*+-+*+-+*+-+*      
+  // Helper structure to save v0 duplicates auxiliary info
+  struct V0DuplicateExtra {    
+    bool isBestPA;
+    bool isBestDCADau;
+    bool isBestMLScore;
+    float PA;    
+    float MLScore;
+  };
   //*+-+*+-+*+-+*+-+*+-+*+-+*+-+*+-+*+-+*+-+*
 
   HistogramRegistry histos{"Histos", {}, OutputObjHandlingPolicy::AnalysisObject};
@@ -593,6 +634,9 @@ struct StrangenessBuilder {
       hFindable->GetXaxis()->SetBinLabel(5, "Cascades to be built");
       hFindable->GetXaxis()->SetBinLabel(6, "Cascades with collId -1");
     }
+
+    histos.add("DeduplicationQA/hMLScore", "hMLScore", kTH1F, {{200, 0.0f, 1.0f}});
+    histos.add("DeduplicationQA/hPA", "hPA", kTH1F, {{200, 0.0f, 0.4f}});
 
     auto hPrimaryV0s = histos.add<TH1>("hPrimaryV0s", "hPrimaryV0s", kTH1D, {{2, -0.5f, 1.5f}});
     hPrimaryV0s->GetXaxis()->SetBinLabel(1, "All V0s");
@@ -714,6 +758,141 @@ struct StrangenessBuilder {
     straHelper.cascadeselections.dcacascdau = cascadeBuilderOpts.dcacascdau;
     straHelper.cascadeselections.lambdaMassWindow = cascadeBuilderOpts.lambdaMassWindow;
     straHelper.cascadeselections.maxDaughterEta = cascadeBuilderOpts.maxDaughterEta;
+
+    // Loading BDT model
+    if (DeduplicationOpts.deduplicationAlgorithm.value==4 || DeduplicationOpts.deduplicationAlgorithm.value==6){
+      if (DeduplicationOpts.loadModelsFromCCDB) { 
+        // Retrieve the model from CCDB
+        ccdbApi.init(DeduplicationOpts.ccdbUrl);
+
+        /// Fetching model for specific timestamp
+        LOG(info) << "Fetching model for timestamp: " << DeduplicationOpts.timestampCCDB.value;
+        
+        bool retrieveSuccess = ccdbApi.retrieveBlob(DeduplicationOpts.BDTPathCCDB.value, ".", metadata, DeduplicationOpts.timestampCCDB.value, false, DeduplicationOpts.BDTLocalPath.value);
+        if (retrieveSuccess) {
+          deduplication_bdt.initModel(DeduplicationOpts.BDTLocalPath.value, DeduplicationOpts.enableOptimizations.value);
+        } else {
+          LOG(fatal) << "Error encountered while fetching/loading the Gamma model from CCDB! Maybe the model doesn't exist yet for this runnumber/timestamp?";
+        }
+      }
+      else{
+        deduplication_bdt.initModel(DeduplicationOpts.BDTLocalPath.value, DeduplicationOpts.enableOptimizations.value);      
+      }
+    }         
+  }
+
+    //_______________________________________________________________________
+  // Process duplicated photons
+  template <class TBCs, typename TCollisions, typename TTracks>
+  std::vector<V0DuplicateExtra> processDuplicates(TCollisions const& collisions, TTracks const& tracks, std::vector<o2::pwglf::V0group> V0Grouped, size_t iV0)
+  {
+    auto pTrack = tracks.rawIteratorAt(V0Grouped[iV0].posTrackId);
+    auto nTrack = tracks.rawIteratorAt(V0Grouped[iV0].negTrackId);
+
+    bool isPosTPCOnly = (pTrack.hasTPC() && !pTrack.hasITS() && !pTrack.hasTRD() && !pTrack.hasTOF());
+    bool isNegTPCOnly = (nTrack.hasTPC() && !nTrack.hasITS() && !nTrack.hasTRD() && !nTrack.hasTOF());
+
+    // don't try to de-duplicate if no track is TPC only
+    if (!isPosTPCOnly && !isNegTPCOnly) {
+      return {};
+    }
+
+    // fitness criteria defined here
+    float bestPointingAngle = 10; // a nonsense angle, anything's better
+    size_t bestPointingAngleIndex = -1;
+
+    float bestDCADaughters = 1e+3; // an excessively large DCA
+    size_t bestDCADaughtersIndex = -1;
+
+    float bestMLScore = -1; // a nonsense ML score
+    size_t bestMLScoreIndex = -1;
+
+    std::vector<V0DuplicateExtra> V0DuplicateExtras; // Vector to store V0 duplicate info
+    for (size_t ic = 0; ic < V0Grouped[iV0].collisionIds.size(); ic++) {
+
+      // Helper structure to save duplicates info - initializing with dummy values
+      V0DuplicateExtra v0DuplicateInfo;            
+      v0DuplicateInfo.isBestPA = false;
+      v0DuplicateInfo.isBestDCADau = false;
+      v0DuplicateInfo.isBestMLScore = false;
+      v0DuplicateInfo.PA = 10; 
+      v0DuplicateInfo.MLScore = -1;
+
+      V0DuplicateExtras.push_back(v0DuplicateInfo);
+
+      // get track parametrizations, collisions
+      auto posTrackPar = getTrackParCov(pTrack);
+      auto negTrackPar = getTrackParCov(nTrack);
+      auto const& collision = collisions.rawIteratorAt(V0Grouped[iV0].collisionIds[ic]);
+
+      // handle TPC-only tracks properly (photon conversions)
+      if (v0BuilderOpts.moveTPCOnlyTracks) {
+        if (isPosTPCOnly) {
+          // Nota bene: positive is TPC-only -> this entire V0 merits treatment as photon candidate
+          posTrackPar.setPID(o2::track::PID::Electron);
+          negTrackPar.setPID(o2::track::PID::Electron);
+          if (!mVDriftMgr.moveTPCTrack<TBCs, TCollisions>(collision, pTrack, posTrackPar)) {
+            continue;
+          }
+        }
+        if (isNegTPCOnly) {
+          // Nota bene: negative is TPC-only -> this entire V0 merits treatment as photon candidate
+          posTrackPar.setPID(o2::track::PID::Electron);
+          negTrackPar.setPID(o2::track::PID::Electron);
+          if (!mVDriftMgr.moveTPCTrack<TBCs, TCollisions>(collision, nTrack, negTrackPar)) {
+            continue;
+          }
+        }
+      } // end TPC drift treatment
+
+      // process candidate with helper, generate properties for consulting
+      // <false>: do not apply selections: do as much as possible to preserve
+      // candidate at this level and do not select with topo selections
+      if (straHelper.buildV0Candidate<false>(V0Grouped[iV0].collisionIds[ic], collision.posX(), collision.posY(), collision.posZ(), pTrack, nTrack, posTrackPar, negTrackPar, true, false, true)) {
+      
+        // candidate built, check pointing angle
+        if (straHelper.v0.pointingAngle < bestPointingAngle) {
+          bestPointingAngle = straHelper.v0.pointingAngle;
+          bestPointingAngleIndex = ic;
+        }
+        if (straHelper.v0.daughterDCA < bestDCADaughters) {
+          bestDCADaughters = straHelper.v0.daughterDCA;
+          bestDCADaughtersIndex = ic;
+        }              
+        
+        // Calculating BDT score if necessary
+        if (DeduplicationOpts.deduplicationAlgorithm.value==4 || DeduplicationOpts.deduplicationAlgorithm.value==6){
+          std::vector<float> inputFeatures{straHelper.v0.v0DCAToPVz, straHelper.v0.pointingAngle};
+          float* BDTProbability = deduplication_bdt.evalModel(inputFeatures); 
+        
+          if (BDTProbability[1] > bestMLScore) {
+            bestMLScore = BDTProbability[1];
+            bestMLScoreIndex = ic;
+          } 
+        
+          // QA histo
+          histos.fill(HIST("DeduplicationQA/hMLScore"), BDTProbability[1]);
+
+          // Updating BDT score info in the struct 
+          V0DuplicateExtras[ic].MLScore = BDTProbability[1];
+        }
+        
+        // QA histo
+          histos.fill(HIST("DeduplicationQA/hPA"), straHelper.v0.pointingAngle);
+
+        // Updating Pointing angle info in the struct
+        V0DuplicateExtras[ic].PA = straHelper.v0.pointingAngle;        
+      } // end build V0
+      
+    } // end candidate loop
+
+    // Defining the winners:
+    if (bestPointingAngleIndex != static_cast<size_t>(-1)) V0DuplicateExtras[bestPointingAngleIndex].isBestPA = true;
+    if (bestDCADaughtersIndex != static_cast<size_t>(-1)) V0DuplicateExtras[bestDCADaughtersIndex].isBestDCADau = true;
+    if (bestMLScoreIndex != static_cast<size_t>(-1)) V0DuplicateExtras[bestMLScoreIndex].isBestMLScore = true;
+
+   // return vector with duplicates info 
+   return V0DuplicateExtras;
   }
 
   // for sorting
@@ -885,7 +1064,7 @@ struct StrangenessBuilder {
       // keep all unless de-duplication active
       ao2dV0toV0List.resize(v0s.size(), -1); // -1 means keep, -2 means do not keep
 
-      if (deduplicationAlgorithm > 0 && v0BuilderOpts.generatePhotonCandidates) {
+      if (DeduplicationOpts.deduplicationAlgorithm.value > 0 && v0BuilderOpts.generatePhotonCandidates) {
         // handle duplicates explicitly: group V0s according to (p,n) indices
         // will provide a list of collisionIds (in V0group), allowing for
         // easy de-duplication when passing to the v0List
@@ -895,82 +1074,41 @@ struct StrangenessBuilder {
 
         // process grouped duplicates, remove 'bad' ones
         for (size_t iV0 = 0; iV0 < v0tableGrouped.size(); iV0++) {
-          auto pTrack = tracks.rawIteratorAt(v0tableGrouped[iV0].posTrackId);
-          auto nTrack = tracks.rawIteratorAt(v0tableGrouped[iV0].negTrackId);
-
-          bool isPosTPCOnly = (pTrack.hasTPC() && !pTrack.hasITS() && !pTrack.hasTRD() && !pTrack.hasTOF());
-          bool isNegTPCOnly = (nTrack.hasTPC() && !nTrack.hasITS() && !nTrack.hasTRD() && !nTrack.hasTOF());
 
           // skip single copy V0s
           if (v0tableGrouped[iV0].collisionIds.size() == 1) {
             continue;
           }
 
-          // don't try to de-duplicate if no track is TPC only
-          if (!isPosTPCOnly && !isNegTPCOnly) {
-            continue;
+          // process duplicates
+          std::vector<V0DuplicateExtra> deduplicationOutput = processDuplicates<TBCs>(collisions, tracks, v0tableGrouped, iV0);
+
+          // skip 
+          if (deduplicationOutput.empty()) {
+            continue; 
           }
-
-          // fitness criteria defined here
-          float bestPointingAngle = 10; // a nonsense angle, anything's better
-          size_t bestPointingAngleIndex = -1;
-
-          float bestDCADaughters = 1e+3; // an excessively large DCA
-          size_t bestDCADaughtersIndex = -1;
-
-          for (size_t ic = 0; ic < v0tableGrouped[iV0].collisionIds.size(); ic++) {
-            // get track parametrizations, collisions
-            auto posTrackPar = getTrackParCov(pTrack);
-            auto negTrackPar = getTrackParCov(nTrack);
-            auto const& collision = collisions.rawIteratorAt(v0tableGrouped[iV0].collisionIds[ic]);
-
-            // handle TPC-only tracks properly (photon conversions)
-            if (v0BuilderOpts.moveTPCOnlyTracks) {
-              if (isPosTPCOnly) {
-                // Nota bene: positive is TPC-only -> this entire V0 merits treatment as photon candidate
-                posTrackPar.setPID(o2::track::PID::Electron);
-                negTrackPar.setPID(o2::track::PID::Electron);
-                if (!mVDriftMgr.moveTPCTrack<TBCs, TCollisions>(collision, pTrack, posTrackPar)) {
-                  return;
-                }
-              }
-              if (isNegTPCOnly) {
-                // Nota bene: negative is TPC-only -> this entire V0 merits treatment as photon candidate
-                posTrackPar.setPID(o2::track::PID::Electron);
-                negTrackPar.setPID(o2::track::PID::Electron);
-                if (!mVDriftMgr.moveTPCTrack<TBCs, TCollisions>(collision, nTrack, negTrackPar)) {
-                  return;
-                }
-              }
-            } // end TPC drift treatment
-
-            // process candidate with helper, generate properties for consulting
-            // <false>: do not apply selections: do as much as possible to preserve
-            // candidate at this level and do not select with topo selections
-            if (straHelper.buildV0Candidate<false>(v0tableGrouped[iV0].collisionIds[ic], collision.posX(), collision.posY(), collision.posZ(), pTrack, nTrack, posTrackPar, negTrackPar, true, false, true)) {
-              // candidate built, check pointing angle
-              if (straHelper.v0.pointingAngle < bestPointingAngle) {
-                bestPointingAngle = straHelper.v0.pointingAngle;
-                bestPointingAngleIndex = ic;
-              }
-              if (straHelper.v0.daughterDCA < bestDCADaughters) {
-                bestDCADaughters = straHelper.v0.daughterDCA;
-                bestDCADaughtersIndex = ic;
-              }
-            } // end build V0
-          } // end candidate loop
 
           // mark de-duplicated candidates
           for (size_t ic = 0; ic < v0tableGrouped[iV0].collisionIds.size(); ic++) {
             ao2dV0toV0List[v0tableGrouped[iV0].V0Ids[ic]] = -2;
             // algorithm 1: best pointing angle
-            if (bestPointingAngleIndex == ic && deduplicationAlgorithm.value == 1) {
+            if (deduplicationOutput[ic].isBestPA && DeduplicationOpts.deduplicationAlgorithm.value == 1) {
               ao2dV0toV0List[v0tableGrouped[iV0].V0Ids[ic]] = -1; // keep best only
             }
-            if (bestDCADaughtersIndex == ic && deduplicationAlgorithm.value == 2) {
+            if (deduplicationOutput[ic].isBestDCADau && DeduplicationOpts.deduplicationAlgorithm.value == 2) {
               ao2dV0toV0List[v0tableGrouped[iV0].V0Ids[ic]] = -1; // keep best only
             }
-            if (bestDCADaughtersIndex == ic && bestPointingAngleIndex == ic && deduplicationAlgorithm.value == 3) {
+            if (deduplicationOutput[ic].isBestDCADau && deduplicationOutput[ic].isBestPA && DeduplicationOpts.deduplicationAlgorithm.value == 3) {
+              ao2dV0toV0List[v0tableGrouped[iV0].V0Ids[ic]] = -1; // keep best only
+            }
+            if (deduplicationOutput[ic].isBestMLScore && DeduplicationOpts.deduplicationAlgorithm.value == 4) {
+              ao2dV0toV0List[v0tableGrouped[iV0].V0Ids[ic]] = -1; // keep best only
+            }
+            // Selection-based duplicate removal
+            if (deduplicationOutput[ic].PA <= DeduplicationOpts.PAthreshold && DeduplicationOpts.deduplicationAlgorithm.value == 5) {
+              ao2dV0toV0List[v0tableGrouped[iV0].V0Ids[ic]] = -1; // keep best only
+            }
+            if (deduplicationOutput[ic].MLScore >= DeduplicationOpts.BDTthreshold && DeduplicationOpts.deduplicationAlgorithm.value == 6) {
               ao2dV0toV0List[v0tableGrouped[iV0].V0Ids[ic]] = -1; // keep best only
             }
           }
@@ -1408,7 +1546,7 @@ struct StrangenessBuilder {
 
           auto const& collision = collisions.rawIteratorAt(v0.collisionId);
           if (!mVDriftMgr.moveTPCTrack<TBCs, TCollisions>(collision, posTrack, posTrackPar)) {
-            return;
+            continue;
           }
         }
 
@@ -1420,7 +1558,7 @@ struct StrangenessBuilder {
 
           auto const& collision = collisions.rawIteratorAt(v0.collisionId);
           if (!mVDriftMgr.moveTPCTrack<TBCs, TCollisions>(collision, negTrack, negTrackPar)) {
-            return;
+            continue;
           }
         }
       }
