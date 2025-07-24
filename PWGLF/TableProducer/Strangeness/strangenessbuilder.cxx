@@ -807,7 +807,18 @@ struct StrangenessBuilder {
     float bestMLScore = -1; // a nonsense ML score
     size_t bestMLScoreIndex = -1;
 
-    std::vector<V0DuplicateExtra> V0DuplicateExtras; // Vector to store V0 duplicate info
+    // Defining context variables
+    int NDuplicates = 0;
+    float AvgPA = 0.0f;    
+
+    // Containers for ranking
+    std::vector<float> paVec(V0Grouped[iV0].collisionIds.size(), 999.f);
+    std::vector<float> v0zVec(V0Grouped[iV0].collisionIds.size(), 999.f);
+
+    // Auxiliary vector to store V0 duplicate info
+    std::vector<V0DuplicateExtra> V0DuplicateExtras; 
+
+    // Loop over duplicates 
     for (size_t ic = 0; ic < V0Grouped[iV0].collisionIds.size(); ic++) {
 
       // Helper structure to save duplicates info - initializing with dummy values
@@ -816,8 +827,11 @@ struct StrangenessBuilder {
       v0DuplicateInfo.isBestDCADau = false;
       v0DuplicateInfo.isBestMLScore = false;
       v0DuplicateInfo.PA = 10; 
+      v0DuplicateInfo.V0DCAToPVz = 999.f; 
+      v0DuplicateInfo.V0z = 999.f; 
       v0DuplicateInfo.MLScore = -1;
 
+      // We include V0DuplicateExtra info in the vector at this point to avoid indexing issues later
       V0DuplicateExtras.push_back(v0DuplicateInfo);
 
       // get track parametrizations, collisions
@@ -858,35 +872,72 @@ struct StrangenessBuilder {
         if (straHelper.v0.daughterDCA < bestDCADaughters) {
           bestDCADaughters = straHelper.v0.daughterDCA;
           bestDCADaughtersIndex = ic;
-        }              
-        
-        // Calculating BDT score if necessary
-        if (DeduplicationOpts.deduplicationAlgorithm.value==4 || DeduplicationOpts.deduplicationAlgorithm.value==6){
-          std::vector<float> inputFeatures{straHelper.v0.v0DCAToPVz, straHelper.v0.pointingAngle};
-          float* BDTProbability = deduplication_bdt.evalModel(inputFeatures); 
-        
-          if (BDTProbability[1] > bestMLScore) {
-            bestMLScore = BDTProbability[1];
-            bestMLScoreIndex = ic;
-          } 
-        
-          // QA histo
-          histos.fill(HIST("DeduplicationQA/hMLScore"), BDTProbability[1]);
-
-          // Updating BDT score info in the struct 
-          V0DuplicateExtras[ic].MLScore = BDTProbability[1];
+        }                                      
+        // Calculating features for ML Analysis
+        if (DeduplicationOpts.deduplicationAlgorithm.value==4 || DeduplicationOpts.deduplicationAlgorithm.value==6){      
+                        
+          // Filling context variables info                     
+          AvgPA += straHelper.v0.pointingAngle;                    
+          paVec[ic] = straHelper.v0.pointingAngle;
+          v0zVec[ic] = std::abs(straHelper.v0.position[2]);          
+          
+          NDuplicates++;
         }
         
         // QA histo
-          histos.fill(HIST("DeduplicationQA/hPA"), straHelper.v0.pointingAngle);
+        histos.fill(HIST("DeduplicationQA/hPA"), straHelper.v0.pointingAngle);
 
-        // Updating Pointing angle info in the struct
+        // Updating values in the struct
         V0DuplicateExtras[ic].PA = straHelper.v0.pointingAngle;        
-      } // end build V0
-      
-    } // end candidate loop
+        V0DuplicateExtras[ic].V0DCAToPVz = std::abs(straHelper.v0.v0DCAToPVz); 
+        V0DuplicateExtras[ic].V0z = std::abs(straHelper.v0.position[2]); 
 
-    // Defining the winners:
+      } // end build V0
+
+    } // end candidate loop
+    
+
+    // Additional loop to perform ML Analysis if requested
+    if (DeduplicationOpts.deduplicationAlgorithm.value==4 || DeduplicationOpts.deduplicationAlgorithm.value==6){
+      // Preparing features    
+      if (NDuplicates > 0) {
+        AvgPA /= NDuplicates;
+        AvgZ /= NDuplicates;                
+        AvgV0DCAz /= NDuplicates;
+      }
+
+      // Fill the ML score for all candidates
+      for (size_t ic = 0; ic < V0Grouped[iV0].collisionIds.size(); ic++) {
+
+        // Skip if no candidate was built
+        
+
+        // List of variables      
+        std::vector<float> inputFeatures{straHelper.v0.v0DCAToPVz,      // 1. V0DCAToPVz
+                                         straHelper.v0.pointingAngle,   // 2. PointingAngle
+                                         V0Z,                           // 3. V0z 
+                                         V0PARank,                      // 4. V0PARank
+                                         NDuplicates,                   // 5. V0NDuplicates
+                                         AvgPA,                         // 6. V0AvgPA
+                                         v0zVec[ic]};                   // 7. V0ZRank 
+
+
+        float* BDTProbability = deduplication_bdt.evalModel(inputFeatures); 
+      
+        if (BDTProbability[1] > bestMLScore) {
+          bestMLScore = BDTProbability[1];
+          bestMLScoreIndex = ic;
+        } 
+      
+        // QA histo
+        histos.fill(HIST("DeduplicationQA/hMLScore"), BDTProbability[1]);
+
+        // Updating BDT score info in the struct 
+        V0DuplicateExtras[ic].MLScore = BDTProbability[1];        
+      }
+    }
+
+    // Final step: Defining the winners:
     if (bestPointingAngleIndex != static_cast<size_t>(-1)) V0DuplicateExtras[bestPointingAngleIndex].isBestPA = true;
     if (bestDCADaughtersIndex != static_cast<size_t>(-1)) V0DuplicateExtras[bestDCADaughtersIndex].isBestDCADau = true;
     if (bestMLScoreIndex != static_cast<size_t>(-1)) V0DuplicateExtras[bestMLScoreIndex].isBestMLScore = true;
@@ -1083,7 +1134,7 @@ struct StrangenessBuilder {
           // process duplicates
           std::vector<V0DuplicateExtra> deduplicationOutput = processDuplicates<TBCs>(collisions, tracks, v0tableGrouped, iV0);
 
-          // skip 
+          // skip if empty
           if (deduplicationOutput.empty()) {
             continue; 
           }
@@ -1095,12 +1146,15 @@ struct StrangenessBuilder {
             if (deduplicationOutput[ic].isBestPA && DeduplicationOpts.deduplicationAlgorithm.value == 1) {
               ao2dV0toV0List[v0tableGrouped[iV0].V0Ids[ic]] = -1; // keep best only
             }
+            // algorithm 2: best DCA between daughters
             if (deduplicationOutput[ic].isBestDCADau && DeduplicationOpts.deduplicationAlgorithm.value == 2) {
               ao2dV0toV0List[v0tableGrouped[iV0].V0Ids[ic]] = -1; // keep best only
             }
+            // algorithm 3: best PA AND DCA between daughters
             if (deduplicationOutput[ic].isBestDCADau && deduplicationOutput[ic].isBestPA && DeduplicationOpts.deduplicationAlgorithm.value == 3) {
               ao2dV0toV0List[v0tableGrouped[iV0].V0Ids[ic]] = -1; // keep best only
             }
+            // algorithm 4: best ML Score
             if (deduplicationOutput[ic].isBestMLScore && DeduplicationOpts.deduplicationAlgorithm.value == 4) {
               ao2dV0toV0List[v0tableGrouped[iV0].V0Ids[ic]] = -1; // keep best only
             }
