@@ -442,15 +442,9 @@ struct v0assoqa {
         continue; // skip not built V0s
       }
 
-      if (V0DuplicateExtras[ic].v0PhotonMass > v0BuilderOpts.PhotonMaxMass)
-        continue; // skip anything that doesn't look like a photon
-
       if (!V0DuplicateExtras[ic].IsPrimary && v0BuilderOpts.selectPrimariesOnly)
         continue;
-
-      if (TMath::Abs(V0DuplicateExtras[ic].v0PhotonY) > v0BuilderOpts.V0Rapidity) 
-        continue;
-
+      
       // TODO: include optional pT selection
       
       float pa = v0duplicates[ic].pointingAngle;
@@ -515,16 +509,11 @@ struct v0assoqa {
       // ADDITIONAL SELECTION CRITERIA              
       if (!V0DuplicateExtras[ic].isBuildOk && v0BuilderOpts.selectBuiltOnly) {
         continue; // skip not built V0s
-      }
-      if (V0DuplicateExtras[ic].v0PhotonMass > v0BuilderOpts.PhotonMaxMass)
-        continue; // skip anything that doesn't look like a photon
+      }      
 
       if (!V0DuplicateExtras[ic].IsPrimary && v0BuilderOpts.selectPrimariesOnly)
         continue;
-
-      if (TMath::Abs(V0DuplicateExtras[ic].v0PhotonY) > v0BuilderOpts.V0Rapidity) 
-        continue;
-
+      
       // TODO: include optional pT selection
 
       // --------------------------------------------------------------------------
@@ -629,9 +618,9 @@ struct v0assoqa {
                        collX, collY, collZ, AvgDCADauxy, AvgDCADauz, AvgPA, AvgZ,
                        MinPA, MaxPA, MinZ, MaxZ, MinDCADauxy, MaxDCADauxy, MinDCADauz, MaxDCADauz,
                        MinV0DCAxy, MaxV0DCAxy, MinV0DCAz, MaxV0DCAz,
-                       PARank, ZRank, DCADauxyRank, DCADauzRank, v0DCAxyRank, v0DCAzRank,
+                       static_cast<float>(PARank), static_cast<float>(ZRank), DCADauxyRank, DCADauzRank, v0DCAxyRank, v0DCAzRank,
                        v0PhotonMass, v0pt, v0px, v0py, v0pz, v0Y, v0Eta, 
-                       v0PosTrackTime, v0NegTrackTime, collTime, NDuplicates,
+                       v0PosTrackTime, v0NegTrackTime, collTime, static_cast<float>(NDuplicates),
                        v0GroupID, PDGCode, v0IsCorrectlyAssociated);
     }  // end duplicate loop
 
@@ -780,11 +769,8 @@ struct v0assoqa {
           } // end TPC drift treatment
 
           // process candidate with helper           
-          //bool buildOK = straHelper.buildV0Candidate<false>(v0tableGrouped[iV0].collisionIds[ic], collision.posX(), collision.posY(), collision.posZ(), pTrack, nTrack, posTrackPar, negTrackPar, v0tableGrouped[iV0].isCollinearV0, false, true);                              
-          bool buildOK = straHelper.buildV0Candidate<true>(v0tableGrouped[iV0].collisionIds[ic], collision.posX(), collision.posY(), collision.posZ(), pTrack, nTrack, posTrackPar, negTrackPar, v0tableGrouped[iV0].isCollinearV0, false, true);                                        
-          //bool buildOK = straHelper.buildV0Candidate(v0tableGrouped[iV0].collisionIds[ic], collision.posX(), collision.posY(), collision.posZ(), pTrack, nTrack, posTrackPar, negTrackPar, true, false);                                        
-          //bool buildOK = straHelper.buildV0Candidate<false>(v0tableGrouped[iV0].collisionIds[ic], collision.posX(), collision.posY(), collision.posZ(), pTrack, nTrack, posTrackPar, negTrackPar, true, false, true);                              
-                    
+          bool buildOK = straHelper.buildV0Candidate<false>(v0tableGrouped[iV0].collisionIds[ic], collision.posX(), collision.posY(), collision.posZ(), pTrack, nTrack, posTrackPar, negTrackPar, true, false, true);                              
+                              
           float daughterDCAXY = std::hypot(
             straHelper.v0.positivePosition[0] - straHelper.v0.negativePosition[0],
             straHelper.v0.positivePosition[1] - straHelper.v0.negativePosition[1]);
