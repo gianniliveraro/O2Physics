@@ -310,6 +310,7 @@ DECLARE_SOA_TABLE(Sigma0LambdaExtras, "AOD", "SIGMA0LAMBDA",
                   sigma0LambdaExtra::LambdaV0Type);
 
 // for MC
+// for MC
 namespace sigma0MCCore
 {
 DECLARE_SOA_COLUMN(MCradius, mcradius, float);

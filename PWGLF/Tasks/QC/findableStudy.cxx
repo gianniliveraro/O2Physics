@@ -62,7 +62,7 @@ using namespace o2::framework;
 using namespace o2::framework::expressions;
 using std::array;
 
-using recoStraCollisions = soa::Join<aod::StraCollisions, aod::StraEvSels, aod::StraCents, aod::StraRawCents, aod::StraCollLabels>;
+using recoStraCollisions = soa::Join<aod::StraCollisions, aod::StraEvSels, aod::StraCents, aod::StraCollLabels>;
 using reconstructedV0s = soa::Join<aod::V0CoreMCLabels, aod::V0Cores, aod::V0FoundTags, aod::V0MCCollRefs, aod::V0CollRefs, aod::V0Extras, aod::V0TOFPIDs, aod::V0TOFNSigmas>;
 using reconstructedV0sNoMC = soa::Join<aod::V0Cores, aod::V0Extras>;
 
@@ -82,10 +82,39 @@ struct findableStudy {
   ConfigurableAxis axisPt{"axisPt", {VARIABLE_WIDTH, 0.0f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 1.9f, 2.0f, 2.2f, 2.4f, 2.6f, 2.8f, 3.0f, 3.2f, 3.4f, 3.6f, 3.8f, 4.0f, 4.4f, 4.8f, 5.2f, 5.6f, 6.0f, 6.5f, 7.0f, 7.5f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 17.0f, 19.0f, 21.0f, 23.0f, 25.0f, 30.0f, 35.0f, 40.0f, 50.0f}, "pt axis for analysis"};
   ConfigurableAxis axisCentrality{"axisCentrality", {VARIABLE_WIDTH, 0.0f, 5.0f, 10.0f, 20.0f, 30.0f, 40.0f, 50.0f, 60.0f, 70.0f, 80.0f, 90.0f}, "Centrality"};
 
+  ConfigurableAxis axisV0Radius{"axisV0Radius", {240, 0.0f, 250.0f}, "V0 radius (cm)"};
+  ConfigurableAxis axisV0PairRadius{"axisV0PairRadius", {200, 0.0f, 20.0f}, "V0Pair radius (cm)"};
+  ConfigurableAxis axisDCAtoPV{"axisDCAtoPV", {500, 0.0f, 50.0f}, "DCA (cm)"};
+  ConfigurableAxis axisDCAdau{"axisDCAdau", {50, 0.0f, 5.0f}, "DCA (cm)"};
+  ConfigurableAxis axisCosPA{"axisCosPA", {200, 0.5f, 1.0f}, "Cosine of pointing angle"};
+  ConfigurableAxis axisPA{"axisPA", {100, 0.0f, 1}, "Pointing angle"};
+  ConfigurableAxis axisEta{"axisEta", {250, -0.8f, 0.8f}, "Eta"};
+  ConfigurableAxis axisPhi{"axisPhi", {200, 0, 2 * o2::constants::math::PI}, "Phi for photons"};
+  ConfigurableAxis axisZ{"axisZ", {120, -120.0f, 120.0f}, "V0 Z position (cm)"};
+
+
   // +-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+
   // Full wrapper for configurables related to actual analysis
   Configurable<v0SelectionGroup> v0Selections{"v0Selections", {}, "V0 selection criteria for analysis"};
   // +-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+-~-+
+
+  // Manually added photon configurables
+  struct : ConfigurableGroup {
+    Configurable<int> Photonv0TypeSel{"Photonv0TypeSel", 7, "select on a certain V0 type (leave negative if no selection desired)"};
+    Configurable<float> PhotonMinDCADauToPv{"PhotonMinDCADauToPv", 0.0, "Min DCA daughter To PV (cm)"};
+    Configurable<float> PhotonMaxDCAV0Dau{"PhotonMaxDCAV0Dau", 3.5, "Max DCA V0 Daughters (cm)"};
+    Configurable<int> PhotonMinTPCCrossedRows{"PhotonMinTPCCrossedRows", 30, "Min daughter TPC Crossed Rows"};
+    Configurable<float> PhotonMinTPCNSigmas{"PhotonMinTPCNSigmas", -7, "Min TPC NSigmas for daughters"};
+    Configurable<float> PhotonMaxTPCNSigmas{"PhotonMaxTPCNSigmas", 7, "Max TPC NSigmas for daughters"};
+    Configurable<float> PhotonMinRadius{"PhotonMinRadius", 3.0, "Min photon conversion radius (cm)"};
+    Configurable<float> PhotonMaxRadius{"PhotonMaxRadius", 115, "Max photon conversion radius (cm)"};
+    Configurable<float> PhotonMaxZ{"PhotonMaxZ", 240, "Max photon conversion point z value (cm)"};
+    Configurable<float> PhotonMaxQt{"PhotonMaxQt", 0.05, "Max photon qt value (AP plot) (GeV/c)"};
+    Configurable<float> PhotonMinV0cospa{"PhotonMinV0cospa", 0.80, "Min V0 CosPA"};
+    Configurable<float> PhotonMaxMass{"PhotonMaxMass", 0.10, "Max photon mass (GeV/c^{2})"};
+    Configurable<float> PhotonMaxDauEta{"PhotonMaxDauEta", 0.8, "Max pseudorapidity of daughter tracks"};
+    Configurable<float> PhotonLineCutZ0{"PhotonLineCutZ0", 7.0, "The offset for the linecute used in the Z vs R plot"};
+  } photonSelections; 
 
   // pack track quality but separte also afterburner
   // dynamic range: 0-31
@@ -160,12 +189,44 @@ struct findableStudy {
     histos.add("h2dPtVsCentrality_DcaNegToPV", "h2dPtVsCentrality_DcaNegToPV", kTH2D, {axisCentrality, axisPt});
     histos.add("h2dPtVsCentrality_DcaV0Dau", "h2dPtVsCentrality_DcaV0Dau", kTH2D, {axisCentrality, axisPt});
 
+    // Findable topology
+    histos.add("FindableTopology/h2dPtVsV0Radius", "h2dPtVsV0Radius", kTH2D, {axisPt, axisV0Radius});
+    histos.add("FindableTopology/h2dPtVsV0CosPA", "h2dPtVsV0CosPA", kTH2D, {axisPt, axisCosPA});
+    histos.add("FindableTopology/h2dPtVsDcaPosToPV", "h2dPtVsDcaPosToPV", kTH2D, {axisPt, axisDCAtoPV});
+    histos.add("FindableTopology/h2dPtVsDcaNegToPV", "h2dPtVsDcaNegToPV", kTH2D, {axisPt, axisDCAtoPV});
+    histos.add("FindableTopology/h2dPtVsDcaV0Dau", "h2dPtVsDcaV0Dau", kTH2D, {axisPt, axisDCAdau});
+    histos.add("FindableTopology/h2dPtVsZ", "h2dPtVsZ", kTH2D, {axisPt, axisZ});
+    histos.add("FindableTopology/h2dPtVsEta", "h2dPtVsEta", kTH2D, {axisPt, axisEta});
+
+    // Found topology
+    histos.add("FoundTopology/h2dPtVsV0Radius", "h2dPtVsV0Radius", kTH2D, {axisPt, axisV0Radius});
+    histos.add("FoundTopology/h2dPtVsV0CosPA", "h2dPtVsV0CosPA", kTH2D, {axisPt, axisCosPA});
+    histos.add("FoundTopology/h2dPtVsDcaPosToPV", "h2dPtVsDcaPosToPV", kTH2D, {axisPt, axisDCAtoPV});
+    histos.add("FoundTopology/h2dPtVsDcaNegToPV", "h2dPtVsDcaNegToPV", kTH2D, {axisPt, axisDCAtoPV});
+    histos.add("FoundTopology/h2dPtVsDcaV0Dau", "h2dPtVsDcaV0Dau", kTH2D, {axisPt, axisDCAdau});
+    histos.add("FoundTopology/h2dPtVsZ", "h2dPtVsZ", kTH2D, {axisPt, axisZ});
+    histos.add("FoundTopology/h2dPtVsEta", "h2dPtVsEta", kTH2D, {axisPt, axisEta});
+
     // Track quality tests in steps
     histos.add("h2dTrackPropAcceptablyTracked", "h2dTrackPropAcceptablyTracked", kTH3D, {{32, -0.5, 31.5f}, {32, -0.5, 31.5f}, axisCentrality});
     histos.add("h2dTrackPropFound", "h2dTrackPropFound", kTH3D, {{32, -0.5, 31.5f}, {32, -0.5, 31.5f}, axisCentrality});
     histos.add("h2dTrackPropAnalysisTracks", "h2dTrackPropAnalysisTracks", kTH3D, {{32, -0.5, 31.5f}, {32, -0.5, 31.5f}, axisCentrality});
     histos.add("h2dTrackPropAnalysisTopo", "h2dTrackPropAnalysisTopo", kTH3D, {{32, -0.5, 31.5f}, {32, -0.5, 31.5f}, axisCentrality});
     histos.add("h2dTrackPropAnalysisSpecies", "h2dTrackPropAnalysisSpecies", kTH3D, {{32, -0.5, 31.5f}, {32, -0.5, 31.5f}, axisCentrality});
+
+    // Track Type Histograms Findable
+    histos.add("h2dFindableAllTrackTypes", "h2dFindableAllTrackTypes", kTH3D, {{32, -0.5, 31.5f}, {32, -0.5, 31.5f}, axisPt});
+    histos.add("Photon/h2dFindableAllTrackTypes", "h2dFindableAllTrackTypes", kTH3D, {{32, -0.5, 31.5f}, {32, -0.5, 31.5f}, axisPt});
+    histos.add("Lambda/h2dFindableAllTrackTypes", "h2dFindableAllTrackTypes", kTH3D, {{32, -0.5, 31.5f}, {32, -0.5, 31.5f}, axisPt});
+    histos.add("ALambda/h2dFindableAllTrackTypes", "h2dFindableAllTrackTypes", kTH3D, {{32, -0.5, 31.5f}, {32, -0.5, 31.5f}, axisPt});
+    histos.add("K0Short/h2dFindableAllTrackTypes", "h2dFindableAllTrackTypes", kTH3D, {{32, -0.5, 31.5f}, {32, -0.5, 31.5f}, axisPt});
+    // Track Type Histograms Found
+    histos.add("h2dFoundAllTrackTypes", "h2dFoundAllTrackTypes", kTH3D, {{32, -0.5, 31.5f}, {32, -0.5, 31.5f}, axisPt});
+    histos.add("Photon/h2dFoundAllTrackTypes", "h2dFoundAllTrackTypes", kTH3D, {{32, -0.5, 31.5f}, {32, -0.5, 31.5f}, axisPt});
+    histos.add("Lambda/h2dFoundAllTrackTypes", "h2dFoundAllTrackTypes", kTH3D, {{32, -0.5, 31.5f}, {32, -0.5, 31.5f}, axisPt});
+    histos.add("ALambda/h2dFoundAllTrackTypes", "h2dFoundAllTrackTypes", kTH3D, {{32, -0.5, 31.5f}, {32, -0.5, 31.5f}, axisPt});
+    histos.add("K0Short/h2dFoundAllTrackTypes", "h2dFoundAllTrackTypes", kTH3D, {{32, -0.5, 31.5f}, {32, -0.5, 31.5f}, axisPt});
+
   }
 
   void processEvents(
@@ -215,6 +276,57 @@ struct findableStudy {
     }
   }
 
+  bool passesPhotonTopology(auto const& recv0, auto const& pTrack, auto const& nTrack)
+  {
+    // DCA daughters to PV
+    if (std::abs(recv0.dcapostopv()) < photonSelections.PhotonMinDCADauToPv ||
+        std::abs(recv0.dcanegtopv()) < photonSelections.PhotonMinDCADauToPv) {
+      return false;
+    }
+    // DCA V0 daughters to each other
+    if (recv0.dcaV0daughters() > photonSelections.PhotonMaxDCAV0Dau) {
+      return false;
+    }
+    // V0 radius
+    if (recv0.v0radius() < photonSelections.PhotonMinRadius ||
+        recv0.v0radius() > photonSelections.PhotonMaxRadius) {
+      return false;
+    }
+    // Z position
+    if (std::abs(recv0.z()) > photonSelections.PhotonMaxZ) {
+      return false;
+    }
+    // CosPA
+    if (recv0.v0cosPA() < photonSelections.PhotonMinV0cospa) {
+      return false;
+    }
+    return true;
+  }
+
+  bool passesPhotonSelections(auto const& recv0, auto const& pTrack, auto const& nTrack)
+  {
+    // // V0 type selection
+    // if (photonSelections.Photonv0TypeSel >= 0 && recv0.v0Type() != photonSelections.Photonv0TypeSel) {
+    //   return false;
+    // }
+    // TPC NSigma for electrons
+    if (pTrack.tpcNSigmaEl() < photonSelections.PhotonMinTPCNSigmas ||
+        pTrack.tpcNSigmaEl() > photonSelections.PhotonMaxTPCNSigmas ||
+        nTrack.tpcNSigmaEl() < photonSelections.PhotonMinTPCNSigmas ||
+        nTrack.tpcNSigmaEl() > photonSelections.PhotonMaxTPCNSigmas) {
+      return false;
+    }
+    // Armenteros-Podolanski qt
+    if (recv0.qtarm() > photonSelections.PhotonMaxQt) {
+      return false;
+    }
+    // Photon mass
+    if (recv0.mGamma() > photonSelections.PhotonMaxMass) {
+      return false;
+    }
+    return true;
+  }
+
   void processV0s(
     aod::V0MCCores::iterator const& v0,               // non-duplicated MC V0 decays
     soa::SmallGroups<reconstructedV0s> const& recv0s, // reconstructed versions of the v0
@@ -262,8 +374,16 @@ struct findableStudy {
     int nCandidatesWithTPC = 0;
 
     for (auto& recv0 : recv0s) {
-      if (recv0.v0Type() != 1)
-        continue; // skip anything other than a standard V0
+      // if (recv0.v0Type() != 7 && recv0.v0Type() != 8)
+      //   continue;
+      // // if (pdgCode != 22) {
+      //   if (recv0.v0Type() != 1)
+      //     continue; // skip anything other than a standard V0
+      // // }
+      // else {
+      //   // if (recv0.v0Type() != 7 || recv0.v0type() != 8)
+      //   //   continue; // skip anything other than a photon conversion
+      // }
 
       // de-reference daughter track extras
       auto pTrack = recv0.posTrackExtra_as<dauTracks>();
@@ -293,25 +413,33 @@ struct findableStudy {
           centrality = coll.centFT0C();
         }
 
+        histos.fill(HIST("FindableTopology/h2dPtVsV0Radius"), ptmc, recv0.v0radius());
+        histos.fill(HIST("FindableTopology/h2dPtVsV0CosPA"), ptmc, recv0.v0cosPA());
+        histos.fill(HIST("FindableTopology/h2dPtVsDcaPosToPV"), ptmc, recv0.dcapostopv());
+        histos.fill(HIST("FindableTopology/h2dPtVsDcaNegToPV"), ptmc, recv0.dcanegtopv());
+        histos.fill(HIST("FindableTopology/h2dPtVsDcaV0Dau"), ptmc, recv0.dcaV0daughters());
+        histos.fill(HIST("FindableTopology/h2dPtVsEta"), ptmc, recv0.eta());
+        histos.fill(HIST("FindableTopology/h2dPtVsZ"), ptmc, recv0.z());
+        
         if (recv0.isFound()) {
           hasBeenFoundAny = true; // includes also ITS-only, checked before skipITSonly check
         }
 
-        if (
-          (pTrack.hasTPC() && pTrack.hasITS()) ||     // full global track
-          (pTrack.hasTPC() && pTrack.hasTOF()) ||     // TPC + TOF is accepted
-          (pTrack.hasTPC() && pTrack.hasTRD()) ||     // TPC + TRD is accepted
-          (!pTrack.hasTPC() && pTrack.itsNCls() >= 6) // long ITS-only
-        ) {
-          pTrackOK = true; // for this V0 only
-        }
-        if (
-          (nTrack.hasTPC() && nTrack.hasITS()) ||
-          (nTrack.hasTPC() && nTrack.hasTOF()) || // TPC + TOF is accepted
-          (nTrack.hasTPC() && nTrack.hasTRD()) || // TPC + TRD is accepted
-          (!nTrack.hasTPC() && nTrack.itsNCls() >= 6)) {
-          nTrackOK = true; // for this V0 only
-        }
+        // if (
+        //   (pTrack.hasTPC() && pTrack.hasITS()) ||     // full global track
+        //   (pTrack.hasTPC() && pTrack.hasTOF()) ||     // TPC + TOF is accepted
+        //   (pTrack.hasTPC() && pTrack.hasTRD()) ||     // TPC + TRD is accepted
+        //   (!pTrack.hasTPC() && pTrack.itsNCls() >= 6) // long ITS-only
+        // ) {
+        pTrackOK = true; // for this V0 only
+        // }
+        // if (
+          // (nTrack.hasTPC() && nTrack.hasITS()) ||
+          // (nTrack.hasTPC() && nTrack.hasTOF()) || // TPC + TOF is accepted
+          // (nTrack.hasTPC() && nTrack.hasTRD()) || // TPC + TRD is accepted
+          // (!nTrack.hasTPC() && nTrack.itsNCls() >= 6)) {
+        nTrackOK = true; // for this V0 only
+        // }
 
         if (pTrackOK && nTrackOK)
           hasBeenAcceptablyTracked = true;
@@ -346,28 +474,37 @@ struct findableStudy {
                                      (uint8_t(nTrack.hasTRD()) << hasTRD) |
                                      (uint8_t(nTrack.hasTOF()) << hasTOF));
 
-        if (pTrackOK && nTrackOK && ptmc > 1.0 && ptmc < 1.1) {
+        // if (pTrackOK && nTrackOK && ptmc > 1.0 && ptmc < 1.1) {
           // this particular V0 reco entry has been acceptably tracked. Do bookkeeping
-          histos.fill(HIST("h2dTrackPropAcceptablyTracked"), positiveTrackCode, negativeTrackCode, centrality);
-        }
+        histos.fill(HIST("h2dTrackPropAcceptablyTracked"), positiveTrackCode, negativeTrackCode, centrality);
+        // }
 
         // determine if this V0 would go to analysis or not
         if (recv0.isFound() && pTrackOK && nTrackOK) { // hack to avoid type check; only interested in found type 1
           // at this stage, this should be REALLY mostly unique (unless you switch skipITSonly to false or so)
           // ... but we will cross-check this assumption (hNRecoV0sWithTPC, h2dPtVsCentrality_FoundInLoop)
-          if (pTrack.hasTPC() && !pTrack.hasITS() && !pTrack.hasTRD() && !pTrack.hasTOF()) {
-            LOGF(info, "Positive track is TPC only and this is a found V0. Puzzling!");
-          }
-          if (nTrack.hasTPC() && !nTrack.hasITS() && !nTrack.hasTRD() && !nTrack.hasTOF()) {
-            LOGF(info, "Negative track is TPC only and this is a found V0. Puzzling!");
-          }
+          // if (pTrack.hasTPC() && !pTrack.hasITS() && !pTrack.hasTRD() && !pTrack.hasTOF()) {
+          //   LOGF(info, "Positive track is TPC only and this is a found V0. Puzzling!");
+          // }
+          // if (nTrack.hasTPC() && !nTrack.hasITS() && !nTrack.hasTRD() && !nTrack.hasTOF()) {
+          //   LOGF(info, "Negative track is TPC only and this is a found V0. Puzzling!");
+          // }
 
+          // Topological histograms for found
+          histos.fill(HIST("FoundTopology/h2dPtVsV0Radius"), ptmc, recv0.v0radius());
+          histos.fill(HIST("FoundTopology/h2dPtVsV0CosPA"), ptmc, recv0.v0cosPA());
+          histos.fill(HIST("FoundTopology/h2dPtVsDcaPosToPV"), ptmc, recv0.dcapostopv());
+          histos.fill(HIST("FoundTopology/h2dPtVsDcaNegToPV"), ptmc, recv0.dcanegtopv());
+          histos.fill(HIST("FoundTopology/h2dPtVsDcaV0Dau"), ptmc, recv0.dcaV0daughters());
+          histos.fill(HIST("FoundTopology/h2dPtVsEta"), ptmc, recv0.eta());
+          histos.fill(HIST("FoundTopology/h2dPtVsZ"), ptmc, recv0.z());
+          
           nCandidatesWithTPC++;
           hasBeenFound = true;
           histos.fill(HIST("h2dPtVsCentrality_FoundInLoop"), centrality, ptmc);
-          if (ptmc > 1.0 && ptmc < 1.1) {
-            histos.fill(HIST("h2dTrackPropFound"), positiveTrackCode, negativeTrackCode, centrality);
-          }
+          // if (ptmc > 1.0 && ptmc < 1.1) {
+          histos.fill(HIST("h2dTrackPropFound"), positiveTrackCode, negativeTrackCode, centrality);
+          // }
 
           uint64_t selMap = v0data::computeReconstructionBitmap(recv0, pTrack, nTrack, coll, recv0.yLambda(), recv0.yK0Short(), v0Selections);
 
@@ -383,7 +520,6 @@ struct findableStudy {
             thisSpeciesMask = maskLambdaSpecific;
           if (pdgCode == -3122)
             thisSpeciesMask = maskAntiLambdaSpecific;
-          // add other species masks as necessary
 
           bool validThisSpecies = v0Selections->verifyMask(selMap, thisSpeciesMask);
 
@@ -411,32 +547,69 @@ struct findableStudy {
               histos.fill(HIST("h2dTrackPropAnalysisTracks"), positiveTrackCode, negativeTrackCode, centrality);
             }
           }
-          if (validTrackProperties && validTopology) {
-            histos.fill(HIST("h2dPtVsCentrality_PassesTopological"), centrality, ptmc);
-            if (ptmc > 1.0 && ptmc < 1.1) {
-              histos.fill(HIST("h2dTrackPropAnalysisTopo"), positiveTrackCode, negativeTrackCode, centrality);
-            }
-          }
-          if (validTrackProperties && validTopology && validThisSpecies) {
-            histos.fill(HIST("h2dPtVsCentrality_PassesThisSpecies"), centrality, ptmc);
-            if (ptmc > 1.0 && ptmc < 1.1) {
-              histos.fill(HIST("h2dTrackPropAnalysisSpecies"), positiveTrackCode, negativeTrackCode, centrality);
-            }
-          }
 
-          // topological
-          if (validTrackProperties && validThisSpecies && topoV0RadiusOK)
-            histos.fill(HIST("h2dPtVsCentrality_V0Radius"), centrality, ptmc);
-          if (validTrackProperties && validThisSpecies && topoV0RadiusMaxOK)
-            histos.fill(HIST("h2dPtVsCentrality_V0RadiusMax"), centrality, ptmc);
-          if (validTrackProperties && validThisSpecies && topoV0CosPAOK)
-            histos.fill(HIST("h2dPtVsCentrality_V0CosPA"), centrality, ptmc);
-          if (validTrackProperties && validThisSpecies && topoDcaPosToPVOK)
-            histos.fill(HIST("h2dPtVsCentrality_DcaPosToPV"), centrality, ptmc);
-          if (validTrackProperties && validThisSpecies && topoDcaNegToPVOK)
-            histos.fill(HIST("h2dPtVsCentrality_DcaNegToPV"), centrality, ptmc);
-          if (validTrackProperties && validThisSpecies && topoDcaV0DauOK)
-            histos.fill(HIST("h2dPtVsCentrality_DcaV0Dau"), centrality, ptmc);
+          if (pdgCode != 22){
+
+            if (validTrackProperties && validTopology) {
+              histos.fill(HIST("h2dPtVsCentrality_PassesTopological"), centrality, ptmc);
+              if (ptmc > 1.0 && ptmc < 1.1) {
+                histos.fill(HIST("h2dTrackPropAnalysisTopo"), positiveTrackCode, negativeTrackCode, centrality);
+              }
+            }
+            if (validTrackProperties && validTopology && validThisSpecies) {
+              histos.fill(HIST("h2dPtVsCentrality_PassesThisSpecies"), centrality, ptmc);
+              if (ptmc > 1.0 && ptmc < 1.1) {
+                histos.fill(HIST("h2dTrackPropAnalysisSpecies"), positiveTrackCode, negativeTrackCode, centrality);
+              }
+            }
+            // topological
+            if (validTrackProperties && validThisSpecies && topoV0RadiusOK)
+              histos.fill(HIST("h2dPtVsCentrality_V0Radius"), centrality, ptmc);
+            if (validTrackProperties && validThisSpecies && topoV0RadiusMaxOK)
+              histos.fill(HIST("h2dPtVsCentrality_V0RadiusMax"), centrality, ptmc);
+            if (validTrackProperties && validThisSpecies && topoV0CosPAOK)
+              histos.fill(HIST("h2dPtVsCentrality_V0CosPA"), centrality, ptmc);
+            if (validTrackProperties && validThisSpecies && topoDcaPosToPVOK)
+              histos.fill(HIST("h2dPtVsCentrality_DcaPosToPV"), centrality, ptmc);
+            if (validTrackProperties && validThisSpecies && topoDcaNegToPVOK)
+              histos.fill(HIST("h2dPtVsCentrality_DcaNegToPV"), centrality, ptmc);
+            if (validTrackProperties && validThisSpecies && topoDcaV0DauOK)
+              histos.fill(HIST("h2dPtVsCentrality_DcaV0Dau"), centrality, ptmc);
+          }
+          else {
+            bool validThisSpecies = passesPhotonSelections(recv0, pTrack, nTrack);
+            bool validTopology = passesPhotonTopology(recv0, pTrack, nTrack);
+
+            if (validTrackProperties && validTopology) {
+              histos.fill(HIST("h2dPtVsCentrality_PassesTopological"), centrality, ptmc);
+              if (ptmc > 1.0 && ptmc < 1.1) {
+                histos.fill(HIST("h2dTrackPropAnalysisTopo"), positiveTrackCode, negativeTrackCode, centrality);
+              }
+            }
+            
+            if (validTrackProperties && validThisSpecies && validTopology) {
+              histos.fill(HIST("h2dPtVsCentrality_PassesThisSpecies"), centrality, ptmc);
+              if (ptmc > 1.0 && ptmc < 1.1) {
+                histos.fill(HIST("h2dTrackPropAnalysisSpecies"), positiveTrackCode, negativeTrackCode, centrality);
+              }
+            }
+            
+            // topological for photons
+            if (validTrackProperties && validThisSpecies) {
+              if (recv0.v0radius() > photonSelections.PhotonMinRadius)
+                histos.fill(HIST("h2dPtVsCentrality_V0Radius"), centrality, ptmc);
+              if (recv0.v0radius() < photonSelections.PhotonMaxRadius)
+                histos.fill(HIST("h2dPtVsCentrality_V0RadiusMax"), centrality, ptmc);
+              if (recv0.v0cosPA() > photonSelections.PhotonMinV0cospa)
+                histos.fill(HIST("h2dPtVsCentrality_V0CosPA"), centrality, ptmc);
+              if (std::abs(recv0.dcapostopv()) > photonSelections.PhotonMinDCADauToPv)
+                histos.fill(HIST("h2dPtVsCentrality_DcaPosToPV"), centrality, ptmc);
+              if (std::abs(recv0.dcanegtopv()) > photonSelections.PhotonMinDCADauToPv)
+                histos.fill(HIST("h2dPtVsCentrality_DcaNegToPV"), centrality, ptmc);
+              if (recv0.dcaV0daughters() < photonSelections.PhotonMaxDCAV0Dau)
+                histos.fill(HIST("h2dPtVsCentrality_DcaV0Dau"), centrality, ptmc);
+            }
+          }
         }
       } else {
         continue;
@@ -460,10 +633,107 @@ struct findableStudy {
     }
   }
 
+  void processTrackTypes(
+    aod::V0MCCores::iterator const& v0,               // non-duplicated MC V0 decays
+    soa::SmallGroups<reconstructedV0s> const& recv0s, // reconstructed versions of the v0
+    recoStraCollisions const&,                        // reco collisions for de-reference
+    aod::StraMCCollisions const&,                     // MC collisions for de-reference
+    dauTracks const&                                  // daughter track extras
+  )
+  {
+    if (!v0.isPhysicalPrimary())
+      return;
+    
+    float rapidity = 2.0;
+    if (pdgCode == 310)
+      rapidity = RecoDecay::y(std::array{v0.pxPosMC() + v0.pxNegMC(), v0.pyPosMC() + v0.pyNegMC(), v0.pzPosMC() + v0.pzNegMC()}, o2::constants::physics::MassKaonNeutral);
+    if (pdgCode == 22)
+      rapidity = RecoDecay::y(std::array{v0.pxPosMC() + v0.pxNegMC(), v0.pyPosMC() + v0.pyNegMC(), v0.pzPosMC() + v0.pzNegMC()}, o2::constants::physics::MassPhoton);
+    if (pdgCode == 3122 || pdgCode == -3122)
+      rapidity = RecoDecay::y(std::array{v0.pxPosMC() + v0.pxNegMC(), v0.pyPosMC() + v0.pyNegMC(), v0.pzPosMC() + v0.pzNegMC()}, o2::constants::physics::MassLambda0);
+
+    if (std::abs(rapidity) > 0.5f)
+      return;
+
+    double ptmc = std::hypot(v0.pxPosMC() + v0.pxNegMC(), v0.pyPosMC() + v0.pyNegMC(), v0.pzPosMC() + v0.pzNegMC());
+
+    bool isK0Short = (v0.pdgCode() == 310 && v0.pdgCodePositive() == 211 && v0.pdgCodeNegative() == -211);
+    bool isLambda = (v0.pdgCode() == 3122 && v0.pdgCodePositive() == 2212 && v0.pdgCodeNegative() == -211);
+    bool isALambda = (v0.pdgCode() == -3122 && v0.pdgCodePositive() == 211 && v0.pdgCodeNegative() == -2212);
+    bool isPhoton = (v0.pdgCode() == 22 && v0.pdgCodePositive() == -11 && v0.pdgCodeNegative() == 11);
+    
+    bool hasWrongCollision = false;
+    float centrality = 100.5f;
+
+    for (auto& recv0 : recv0s) {
+      // de-reference daughter track extras
+      auto pTrack = recv0.posTrackExtra_as<dauTracks>();
+      auto nTrack = recv0.negTrackExtra_as<dauTracks>();
+
+      if (recv0.has_straCollision()) {
+        auto coll = recv0.straCollision_as<recoStraCollisions>();
+        int mcCollID_fromCollision = coll.straMCCollisionId();
+        int mcCollID_fromV0 = recv0.straMCCollisionId();
+        if (mcCollID_fromCollision != mcCollID_fromV0) {
+          hasWrongCollision = true;
+        } else {
+          // if this is a correctly collision-associated V0, take centrality from here
+          // N.B.: this could still be an issue if collision <-> mc collision is imperfect
+          centrality = coll.centFT0C();
+        }
+
+        // encode conditions of tracks
+        uint8_t positiveTrackCode = ((uint8_t(pTrack.hasTPC()) << hasTPC) |
+                                    (uint8_t(pTrack.hasITSTracker()) << hasITSTracker) |
+                                    (uint8_t(pTrack.hasITSAfterburner()) << hasITSAfterburner) |
+                                    (uint8_t(pTrack.hasTRD()) << hasTRD) |
+                                    (uint8_t(pTrack.hasTOF()) << hasTOF));
+
+        uint8_t negativeTrackCode = ((uint8_t(nTrack.hasTPC()) << hasTPC) |
+                                    (uint8_t(nTrack.hasITSTracker()) << hasITSTracker) |
+                                    (uint8_t(nTrack.hasITSAfterburner()) << hasITSAfterburner) |
+                                    (uint8_t(nTrack.hasTRD()) << hasTRD) |
+                                    (uint8_t(nTrack.hasTOF()) << hasTOF));
+
+        histos.fill(HIST("h2dFindableAllTrackTypes"), positiveTrackCode, negativeTrackCode, ptmc);
+        if (recv0.isFound()) {
+          histos.fill(HIST("h2dFoundAllTrackTypes"), positiveTrackCode, negativeTrackCode, ptmc);
+        }
+
+        if (isK0Short){
+          histos.fill(HIST("K0Short/h2dFindableAllTrackTypes"), positiveTrackCode, negativeTrackCode, ptmc);
+          if (recv0.isFound()){
+            histos.fill(HIST("K0Short/h2dFoundAllTrackTypes"), positiveTrackCode, negativeTrackCode, ptmc);
+          }
+        }
+        if (isLambda){
+          histos.fill(HIST("Lambda/h2dFindableAllTrackTypes"), positiveTrackCode, negativeTrackCode, ptmc);
+          if (recv0.isFound()){
+            histos.fill(HIST("Lambda/h2dFoundAllTrackTypes"), positiveTrackCode, negativeTrackCode, ptmc);
+          }
+        }
+        if (isALambda){
+          histos.fill(HIST("ALambda/h2dFindableAllTrackTypes"), positiveTrackCode, negativeTrackCode, ptmc);
+          if (recv0.isFound()){
+            histos.fill(HIST("ALambda/h2dFoundAllTrackTypes"), positiveTrackCode, negativeTrackCode, ptmc);
+          }
+        }
+        if (isPhoton){
+          histos.fill(HIST("Photon/h2dFindableAllTrackTypes"), positiveTrackCode, negativeTrackCode, ptmc);
+          if (recv0.isFound()){
+            histos.fill(HIST("Photon/h2dFoundAllTrackTypes"), positiveTrackCode, negativeTrackCode, ptmc);
+          }
+        }
+      }
+    }
+  }
+
   PROCESS_SWITCH(findableStudy, processEvents, "process collision counters", true);
   PROCESS_SWITCH(findableStudy, processDebugCrossCheck, "process debug cross-check of V0 with TPC-only", true);
   PROCESS_SWITCH(findableStudy, processDebugCrossCheckMC, "process debug cross-check of V0 with TPC-only, MC version", false);
   PROCESS_SWITCH(findableStudy, processV0s, "process V0s", true);
+  PROCESS_SWITCH(findableStudy, processTrackTypes, "process track type study", true);
+
 };
 
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
