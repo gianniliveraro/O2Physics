@@ -36,15 +36,18 @@ namespace o2::aod
 {
 
 // Indexing
-namespace sigma0Core
-{
-DECLARE_SOA_INDEX_COLUMN_FULL(PhotonV0, photonV0, int, V0Cores, "_PhotonV0"); //!
-DECLARE_SOA_INDEX_COLUMN_FULL(LambdaV0, lambdaV0, int, V0Cores, "_LambdaV0"); //!
-} // namespace sigma0Core
+// namespace sigma0Core
+// {
+// DECLARE_SOA_INDEX_COLUMN_FULL(PhotonV0, photonV0, int, V0Cores, "_PhotonV0"); //!
+// DECLARE_SOA_INDEX_COLUMN_FULL(LambdaV0, lambdaV0, int, V0Cores, "_LambdaV0"); //!
+// } // namespace sigma0Core
 
 // for real data
 namespace sigma0Core
 {
+DECLARE_SOA_COLUMN(PhotonV0ID, photonV0ID, int);
+DECLARE_SOA_COLUMN(LambdaV0ID, lambdaV0ID, int);
+
 DECLARE_SOA_COLUMN(X, x, float);
 DECLARE_SOA_COLUMN(Y, y, float);
 DECLARE_SOA_COLUMN(Z, z, float);
@@ -163,6 +166,8 @@ DECLARE_SOA_DYNAMIC_COLUMN(LambdaPhi, lambdaPhi, //! Phi in the range [0, 2pi)
 } // namespace sigma0Core
 
 DECLARE_SOA_TABLE(Sigma0Cores, "AOD", "SIGMA0CORES",
+                  // Indices for debug
+                  sigma0Core::PhotonV0ID, sigma0Core::LambdaV0ID,
                   // Basic properties
                   sigma0Core::X, sigma0Core::Y, sigma0Core::Z, sigma0Core::DCADaughters,
                   sigma0Core::PhotonPx, sigma0Core::PhotonPy, sigma0Core::PhotonPz, sigma0Core::PhotonMass,
@@ -567,6 +572,7 @@ DECLARE_SOA_TABLE(Sigma0LambdaExtras, "AOD", "SIGMA0LAMBDA",
 // for MC
 namespace sigma0MCCore
 {
+DECLARE_SOA_COLUMN(ParticleIdMC, particleIdMC, int);            //! V0 Particle ID
 DECLARE_SOA_COLUMN(MCradius, mcradius, float);
 DECLARE_SOA_COLUMN(PDGCode, pdgCode, int);
 DECLARE_SOA_COLUMN(PDGCodeMother, pdgCodeMother, int);
@@ -691,6 +697,8 @@ DECLARE_SOA_DYNAMIC_COLUMN(LambdaMCPhi, lambdaMCPhi, //! Phi in the range [0, 2p
 } // namespace sigma0MCCore
 
 DECLARE_SOA_TABLE(Sigma0MCCores, "AOD", "SIGMA0MCCORES",
+                  // MC particle index for debug
+                  sigma0MCCore::ParticleIdMC,
 
                   // Basic properties
                   sigma0MCCore::MCradius, sigma0MCCore::PDGCode, sigma0MCCore::PDGCodeMother, sigma0MCCore::MCprocess, sigma0MCCore::IsProducedByGenerator,
@@ -728,10 +736,10 @@ DECLARE_SOA_TABLE(Sigma0MCCores, "AOD", "SIGMA0MCCORES",
                   sigma0MCCore::LambdaMCY<sigma0MCCore::LambdaMCPx, sigma0MCCore::LambdaMCPy, sigma0MCCore::LambdaMCPz>,
                   sigma0MCCore::LambdaMCPhi<sigma0MCCore::LambdaMCPx, sigma0MCCore::LambdaMCPy>);
 
-namespace sigma0MCCore
-{
-DECLARE_SOA_INDEX_COLUMN(McParticle, mcParticle); //! MC particle for Sigma0
-}
+// namespace sigma0MCCore
+// {
+// DECLARE_SOA_INDEX_COLUMN(McParticle, mcParticle); //! MC particle for Sigma0
+// }
 
 // for MC
 namespace kstarMCCore
@@ -923,11 +931,11 @@ DECLARE_SOA_TABLE(KStarGens, "AOD", "KSTARGENS",
 DECLARE_SOA_TABLE(SigmaCollRef, "AOD", "SIGMACOLLREF", //! optional table to refer back to a collision
                   o2::soa::Index<>, v0data::StraCollisionId);
 
-DECLARE_SOA_TABLE(SigmaIndices, "AOD", "SIGMAINDEX", //! index table when using AO2Ds
-                  o2::soa::Index<>, sigma0Core::PhotonV0Id, sigma0Core::LambdaV0Id, o2::soa::Marker<1>);
+// DECLARE_SOA_TABLE(SigmaIndices, "AOD", "SIGMAINDEX", //! index table when using AO2Ds
+//                   o2::soa::Index<>, sigma0Core::PhotonV0Id, sigma0Core::LambdaV0Id, o2::soa::Marker<1>);
 
-DECLARE_SOA_TABLE(SigmaMCLabels, "AOD", "SIGMAMCLABEL", //! optional table to refer to mcparticles
-                  o2::soa::Index<>, sigma0MCCore::McParticleId);
+// DECLARE_SOA_TABLE(SigmaMCLabels, "AOD", "SIGMAMCLABEL", //! optional table to refer to mcparticles
+//                   o2::soa::Index<>, sigma0MCCore::McParticleId);
 
 DECLARE_SOA_TABLE(SigmaGenCollRef, "AOD", "SIGMAGENCOLLREF", //! optional table to refer back to a collision
                   o2::soa::Index<>, v0data::StraMCCollisionId);

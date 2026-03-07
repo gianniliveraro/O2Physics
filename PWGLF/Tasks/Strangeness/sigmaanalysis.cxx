@@ -60,6 +60,10 @@ using namespace o2::framework;
 using namespace o2::framework::expressions;
 
 using std::array;
+using dauTracks = soa::Join<aod::DauTrackExtras, aod::DauTrackTPCPIDs>;
+using dauTracksMC = soa::Join<aod::DauTrackExtras, aod::DauTrackMCIds, aod::DauTrackTPCPIDs>;
+using V0StandardDerivedDatas = soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0LambdaMLScores, aod::V0AntiLambdaMLScores, aod::V0GammaMLScores>;
+using V0DerivedMCDatas = soa::Join<aod::V0Cores, aod::V0CollRefs, aod::V0Extras, aod::V0MCMothers, aod::V0CoreMCLabels, aod::V0LambdaMLScores, aod::V0AntiLambdaMLScores, aod::V0GammaMLScores>;
 using MCSigma0s = soa::Join<aod::Sigma0Cores, aod::Sigma0PhotonExtras, aod::Sigma0LambdaExtras, aod::Sigma0MCCores, aod::SigmaCollRef>;
 using Sigma0s = soa::Join<aod::Sigma0Cores, aod::Sigma0PhotonExtras, aod::Sigma0LambdaExtras, aod::SigmaCollRef>;
 
@@ -575,9 +579,15 @@ struct sigmaanalysis {
       histos.add("Sigma0QA/h2dSigma0MCRapVsRecoRap", "h2dSigma0MCRapVsRecoRap", kTH2D, {axisRapidity, axisRapidity});
       histos.add("Sigma0QA/h2dASigma0MCRapVsRecoRap", "h2dASigma0MCRapVsRecoRap", kTH2D, {axisRapidity, axisRapidity});
 
-      histos.add("Sigma0QA/hDuplicates", "hDuplicates", kTH1D, {{10, -0.5f, +9.5f}});
-      histos.add("Sigma0QA/hSigma0Duplicates", "hSigma0Duplicates", kTH1D, {{10, -0.5f, +9.5f}});
-      histos.add("Sigma0QA/hASigma0Duplicates", "hASigma0Duplicates", kTH1D, {{10, -0.5f, +9.5f}});
+      histos.add("Sigma0QA/h2dDuplicates", "h2dDuplicates", kTH2D, {{10, -0.5f, +9.5f}, axisPt});
+      histos.add("Sigma0QA/h2dSigma0Duplicates", "h2dSigma0Duplicates", kTH2D, {{10, -0.5f, +9.5f}, axisPt});
+      histos.add("Sigma0QA/h2dASigma0Duplicates", "h2dASigma0Duplicates", kTH2D, {{10, -0.5f, +9.5f}, axisPt});
+      histos.add("Sigma0QA/h2dPhotonDuplicatesVsLambdaDuplicates", "h2dPhotonDuplicatesVsLambdaDuplicates", kTH2D, {{10, -0.5f, +9.5f}, {10, -0.5f, +9.5f}});
+      
+      histos.add("Sigma0QA/h2dPhotonDuplicates", "h2dPhotonDuplicates", kTH2D, {{10, -0.5f, +9.5f}, axisPt});      
+      histos.add("Sigma0QA/h2dTruePhotonDuplicates", "h2dTruePhotonDuplicates", kTH2D, {{10, -0.5f, +9.5f}, axisPt});
+      histos.add("Sigma0QA/h2dLambdaDuplicates", "h2dLambdaDuplicates", kTH2D, {{10, -0.5f, +9.5f}, axisPt});
+      histos.add("Sigma0QA/h2dTrueLambdaDuplicates", "h2dTrueLambdaDuplicates", kTH2D, {{10, -0.5f, +9.5f}, axisPt});
     }
 
     // inspect histogram sizes, please
@@ -1270,14 +1280,23 @@ struct sigmaanalysis {
     }
   }
 
-  // Sigma0 QA analysis function
+  // Sigma0 QA analysis function 
   template <typename TSigma0s>
-  void doSigma0QA(TSigma0s const& fullSigma0s)
+  void doSigma0QA(std::vector<int> selsigma0Indices, TSigma0s const& fullSigma0s)
   {
     std::unordered_map<int, int> sigma0Counts;
     std::unordered_map<int, int> sigma0Index;
 
-    for (const auto& sigma0 : fullSigma0s) {
+    std::unordered_map<int, int> photonCounts;
+    std::unordered_map<int, int> photonIndex;
+
+    std::unordered_map<int, int> lambdaCounts;
+    std::unordered_map<int, int> lambdaIndex;
+
+    for (size_t i = 0; i < selsigma0Indices.size(); ++i) { // N.B: these are the indices of the sigma0 candidates that passed the event+candidate selections!
+
+      auto sigma0 = fullSigma0s.rawIteratorAt(selsigma0Indices[i]);
+
       // Crosscheck reco rapidity and MC rapidity
       histos.fill(HIST("Sigma0QA/h2dAllSigma0CandMCRapVsRecoRap"), sigma0.sigma0MCY(), sigma0.sigma0Y());
 
@@ -1285,23 +1304,65 @@ struct sigmaanalysis {
         histos.fill(HIST("Sigma0QA/h2dSigma0MCRapVsRecoRap"), sigma0.sigma0MCY(), sigma0.sigma0Y());
       if (sigma0.isAntiSigma0())
         histos.fill(HIST("Sigma0QA/h2dASigma0MCRapVsRecoRap"), sigma0.sigma0MCY(), sigma0.sigma0Y());
-
-      // grouping per mcparticle
-      if (sigma0.has_mcParticle()) {
-        sigma0Counts[sigma0.mcParticleId()] += 1;                  // duplicate count
-        sigma0Index[sigma0.mcParticleId()] = sigma0.globalIndex(); // saving index
-      }
+      
+      // Count how many times a MC sigma0 is reconstructed
+      sigma0Counts[sigma0.particleIdMC()] += 1;                  // duplicate count
+      sigma0Index[sigma0.particleIdMC()] = sigma0.globalIndex(); // saving index
+      
+      photonCounts[sigma0.photonV0ID()] += 1;                  // duplicate count
+      photonIndex[sigma0.photonV0ID()] = sigma0.globalIndex(); // saving index
+          
+      lambdaCounts[sigma0.lambdaV0ID()] += 1;                  // duplicate count
+      lambdaIndex[sigma0.lambdaV0ID()] = sigma0.globalIndex(); // saving index          
     }
-    for (const auto& [mcid, NDuplicates] : sigma0Counts) {
+  
+    // There are smarter ways to do this, but ok
+    for (const auto& [mcid, NDuplicates] : sigma0Counts) {      
+      if (mcid == -1) // safeguard, doesnt make sense to fill the histos for mcid=-1, which means no mc particle was associated to the sigma0 candidate 
+        continue;
+
       auto sigma0mc = fullSigma0s.rawIteratorAt(sigma0Index[mcid]);
-      histos.fill(HIST("Sigma0QA/hDuplicates"), NDuplicates); // how many times a mc sigma0 was reconstructed
+      histos.fill(HIST("Sigma0QA/h2dDuplicates"), NDuplicates, sigma0mc.mcpt()); // how many times all sigma0 candidates (with true MC particle associated) were reconstructed
 
       if (sigma0mc.isSigma0())
-        histos.fill(HIST("Sigma0QA/hSigma0Duplicates"), NDuplicates); // how many times a mc sigma0 was reconstructed
+        histos.fill(HIST("Sigma0QA/h2dSigma0Duplicates"), NDuplicates, sigma0mc.mcpt()); // how many times true mc sigma0s were reconstructed
 
       if (sigma0mc.isAntiSigma0())
-        histos.fill(HIST("Sigma0QA/hASigma0Duplicates"), NDuplicates); // how many times a mc sigma0 was reconstructed
+        histos.fill(HIST("Sigma0QA/h2dASigma0Duplicates"), NDuplicates, sigma0mc.mcpt()); // how many times true mc asigma0s were reconstructed          
+
+      // Q: for duplicated sigma0s, what are the V0s? Is the photonID repeted? Is the lambdaID repeted? 
+      if (NDuplicates>1){
+        histos.fill(HIST("Sigma0QA/h2dPhotonDuplicatesVsLambdaDuplicates"), photonCounts[sigma0mc.photonV0ID()], lambdaCounts[sigma0mc.lambdaV0ID()]); // who is causing problems? photon or lambda?
+      }
+      
     }
+
+    for (const auto& [mcid, NDuplicates] : photonCounts) {
+      auto sigma0mc = fullSigma0s.rawIteratorAt(photonIndex[mcid]);      
+      histos.fill(HIST("Sigma0QA/h2dPhotonDuplicates"), NDuplicates, sigma0mc.photonmcpt()); // how many times a mc photon was reconstructed
+
+      if (sigma0mc.photonPDGCode() == 22)
+        histos.fill(HIST("Sigma0QA/h2dTruePhotonDuplicates"), NDuplicates, sigma0mc.photonmcpt()); // how many times a mc photon was reconstructed
+    }
+
+    for (const auto& [mcid, NDuplicates] : lambdaCounts) {
+      auto sigma0mc = fullSigma0s.rawIteratorAt(lambdaIndex[mcid]);
+      histos.fill(HIST("Sigma0QA/h2dLambdaDuplicates"), NDuplicates, sigma0mc.lambdamcpt()); // how many times a mc lambda was reconstructed
+
+      if (TMath::Abs(sigma0mc.lambdaPDGCode()) == 3122)
+        histos.fill(HIST("Sigma0QA/h2dTrueLambdaDuplicates"), NDuplicates, sigma0mc.lambdamcpt()); // how many times a mc lambda was reconstructed
+    }
+
+  }
+
+  // QA temporary
+  template <typename TCollisions, typename TSigma0s, typename TMCParticles, typename TV0s>
+  void analyzeMCChain(TCollisions const& collisions, TSigma0s const& fullSigma0s, TMCParticles const& mcParticles, TV0s const& fullV0s)
+  {
+    // Q1: how many photon duplicates do we have? (i.e. how many times the same MC photon is reconstructed?)
+    // Q2: how many lambda duplicates do we have? (i.e. how many times the same MC lambda is reconstructed?)
+    // Q3: for duplicated sigma0s, what are the V0s? Is the photonID repeted? Is the lambdaID repeted? Are they the same for the duplicates? (i.e. is it the same photon or lambda that is reconstructed multiple times, or different ones?)
+
   }
 
   // Apply specific selections for photons
@@ -1528,6 +1589,9 @@ struct sigmaanalysis {
   template <typename TCollisions, typename TSigma0s>
   void analyzeRecoeSigma0s(TCollisions const& collisions, TSigma0s const& fullSigma0s)
   {
+    // For postprocessing of selected sigma0s
+    std::vector<int> bestSigma0sArray;
+
     // Custom grouping
     std::vector<std::vector<int>> sigma0grouped(collisions.size());
 
@@ -1562,13 +1626,20 @@ struct sigmaanalysis {
         if (!processSigma0Candidate(sigma0))
           continue;
 
-        // Fill histos after all selections
+        // Save index and fill histos after all selections
+        bestSigma0sArray.push_back(sigma0.globalIndex()); // Save indices of best sigma0 candidates
         fillHistos<1>(sigma0, coll);
       }
     }
 
-    // Optionally run QA analysis for reco sigma0
-    // if (fdoSigma0QA) doSigma0QA(fullSigma0s); // TODO: improve this to run sigma0 QA
+    // Optionally run QA analysis for reco sigma0    
+    if (fdoSigma0QA){    
+      // Get dummy entry to check property
+      auto dummysigma0 = fullSigma0s.rawIteratorAt(0);
+      if constexpr (requires { dummysigma0.particleIdMC(); }) { // If MC
+        doSigma0QA(bestSigma0sArray, fullSigma0s); // TODO: improve this to run sigma0 QA              
+      }      
+    }         
   }
 
   // Apply selections in sigma0 candidates
@@ -1732,6 +1803,12 @@ struct sigmaanalysis {
     analyzeGenerated(mcCollisions, collisions, Sigma0Gens);
   }
 
+  // MC QA of Sigma0 candidates
+  void processMCChainQA(soa::Join<aod::StraCollisions, aod::StraCents, aod::StraEvSels, aod::StraStamps, aod::StraCollLabels> const& collisions, MCSigma0s const& fullSigma0s, aod::McParticles const& mcParticles, dauTracksMC const&, V0StandardDerivedDatas const& fullV0s, soa::Join<aod::V0MCCores, aod::V0MCCollRefs> const&)
+  {
+    analyzeMCChain(collisions, fullSigma0s, mcParticles, fullV0s);
+  }
+
   // _____________________________________________________
   // Pi0 QA
   void processPi0RealData(soa::Join<aod::StraCollisions, aod::StraCents, aod::StraEvSels, aod::StraStamps> const& collisions, soa::Join<aod::Pi0Cores, aod::Pi0CollRef> const& fullPi0s)
@@ -1751,8 +1828,9 @@ struct sigmaanalysis {
 
   // _____________________________________________________
   PROCESS_SWITCH(sigmaanalysis, processRealData, "Do real data analysis", true);
-  PROCESS_SWITCH(sigmaanalysis, processMonteCarlo, "Do Monte-Carlo-based analysis", false);
-  PROCESS_SWITCH(sigmaanalysis, processGeneratedRun3, "process MC generated Run 3", false);
+  PROCESS_SWITCH(sigmaanalysis, processMonteCarlo, "Do Monte-Carlo-based analysis", false);  
+  PROCESS_SWITCH(sigmaanalysis, processGeneratedRun3, "process MC generated Run 3", false);  
+  PROCESS_SWITCH(sigmaanalysis, processMCChainQA, "process MC chain QA", false);  
   PROCESS_SWITCH(sigmaanalysis, processPi0RealData, "Do real data analysis for pi0 QA", false);
   PROCESS_SWITCH(sigmaanalysis, processPi0MonteCarlo, "Do Monte-Carlo-based analysis for pi0 QA", false);
   PROCESS_SWITCH(sigmaanalysis, processPi0GeneratedRun3, "process MC generated Run 3 for pi0 QA", false);
