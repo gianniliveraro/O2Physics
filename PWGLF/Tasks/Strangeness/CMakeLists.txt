@@ -81,7 +81,7 @@ o2physics_add_dpl_workflow(hstrangecorrelation
 
 o2physics_add_dpl_workflow(sigmaanalysis
     SOURCES sigmaanalysis.cxx
-    PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore O2Physics::AnalysisCCDB
+    PUBLIC_LINK_LIBRARIES O2::Framework O2Physics::AnalysisCore O2Physics::AnalysisCCDB O2::EMCALBase O2::EMCALCalib
     COMPONENT_NAME Analysis)
 
 o2physics_add_dpl_workflow(phik0shortanalysis

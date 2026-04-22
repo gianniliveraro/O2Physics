@@ -32,6 +32,9 @@
 #include "Common/DataModel/EventSelection.h"
 #include "Common/DataModel/TrackSelectionTables.h"
 
+#include <EMCALBase/Geometry.h>
+#include <EMCALBase/GeometryBase.h>
+
 #include "CCDB/BasicCCDBManager.h"
 #include "Framework/ASoA.h"
 #include "Framework/ASoAHelpers.h"
@@ -41,10 +44,14 @@
 #include "ReconstructionDataFormats/Track.h"
 
 #include <Math/Vector4D.h>
+#include <Math/GenVector/AxisAngle.h>
+#include <Math/GenVector/Rotation3D.h>
+
 #include <TFile.h>
 #include <TH2F.h>
 #include <TPDGCode.h>
 #include <TProfile.h>
+#include "TRandom.h"
 
 #include <array>
 #include <cmath>
@@ -85,6 +92,7 @@ enum CentEstimator {
 
 struct sigmaanalysis {
   Service<o2::ccdb::BasicCCDBManager> ccdb;
+  emcal::Geometry* emcalGeom;
   ctpRateFetcher rateFetcher;
 
   //__________________________________________________
@@ -221,6 +229,7 @@ struct sigmaanalysis {
     std::string prefix = "EMCalPhotonSelections"; // JSON group name
     Configurable<int> definition{"definition", 13, "Cluster definitions to be accepted (e.g. 13 for kV3MostSplitLowSeed)"};
     Configurable<int> MinCells{"MinCells", 1, "Min number of cells in cluster"};
+    Configurable<int> MaxCells{"MaxCells", 10, "Max number of cells in cluster"};
     Configurable<float> MinEnergy{"MinEnergy", 0.0, "Minimum energy of selected clusters (GeV)"};
     Configurable<float> MaxEnergy{"MaxEnergy", 5, "Max energy of selected clusters (GeV)"};
     Configurable<float> MaxEta{"MaxEta", 1.0, "Max absolute cluster Eta"};
@@ -243,6 +252,20 @@ struct sigmaanalysis {
   } sigma0Selections;
 
   struct : ConfigurableGroup {
+    std::string prefix = "rotationConfig";
+    Configurable<bool> doRotation{"doRotation", false, "Flag to enable rotation background method."};    
+    Configurable<bool> rotatePhotonOnly{"rotatePhotonOnly", true, "Rotate only photons."};    
+    Configurable<bool> rotateLambdaAlso{"rotateLambdaAlso", false, "Also rotate the lambdas."};  
+    Configurable<bool> doCombinations{"doCombinations", false, "Try all combinations of available photons and lambdas."};  // TODO: remove me
+    Configurable<bool> useRandomAngle{"useRandomAngle", false, "Use random angles for rotation instead of fixed pi/2 angle."};  
+    Configurable<int> nRotations{"nRotations", 1, "Number of rotations"};
+    Configurable<float> maxOpenAngle{"maxOpenAngle", 1.0, "Maximum opening angle for rotation"};    
+    Configurable<bool> RemoveCloseToEdge{"RemoveCloseToEdge", false, "Flag to enable removal of clusters close to the EMCal edge"};  // TODO: remove this, we only rotate the lambda
+    Configurable<int> DistanceToEdge{"DistanceToEdge", 1, "Distance to edge in cells required for rotated cluster to be accepted"}; 
+    
+  } rotationConfig;
+  
+  struct : ConfigurableGroup {
     std::string prefix = "pi0Selections"; // JSON group name
     Configurable<float> Pi0MinRapidity{"Pi0MinRapidity", -0.5, "pi0 min rapidity"};
     Configurable<float> Pi0MaxRapidity{"Pi0MaxRapidity", 0.5, "pi0 max rapidity"};
@@ -253,6 +276,7 @@ struct sigmaanalysis {
   // Axis
   // base properties
   ConfigurableAxis axisCentrality{"axisCentrality", {VARIABLE_WIDTH, 0.0f, 5.0f, 10.0f, 20.0f, 30.0f, 40.0f, 50.0f, 60.0f, 70.0f, 80.0f, 90.0f, 100.0f, 110.0f}, "Centrality"};
+  ConfigurableAxis axisVertex{"axisVertex", {5, -10, 10}, "vertex axis for bin"};
   ConfigurableAxis axisPt{"axisPt", {VARIABLE_WIDTH, 0.0f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 1.9f, 2.0f, 2.2f, 2.4f, 2.6f, 2.8f, 3.0f, 3.2f, 3.4f, 3.6f, 3.8f, 4.0f, 4.4f, 4.8f, 5.2f, 5.6f, 6.0f, 6.5f, 7.0f, 7.5f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 17.0f, 19.0f, 21.0f, 23.0f, 25.0f, 30.0f, 35.0f, 40.0f, 50.0f}, "p_{T} (GeV/c)"};
   ConfigurableAxis axisInvPt{"axisInvPt", {VARIABLE_WIDTH, 0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 5.0, 10.0, 20.0, 50.0}, ""};
   ConfigurableAxis axisDeltaPt{"axisDeltaPt", {400, -50.0, 50.0}, ""};
@@ -298,12 +322,16 @@ struct sigmaanalysis {
   ConfigurableAxis axisClrTime{"axisClrTime", {300, -30.0, 30.0}, "cluster time (ns)"};
   ConfigurableAxis axisClrShape{"axisClrShape", {100, 0.0, 1.0}, "cluster shape"};
 
+  // Rotational background specific
+  ConfigurableAxis axisDeltaEta{"axisDeltaEta", {100, -3.0, 3.0}, "Delta Eta"};
+  ConfigurableAxis axisDeltaPhi{"axisDeltaPhi", {100, -7.0, 7.0}, "Delta Phi"};
+
   ConfigurableAxis axisCandSel{"axisCandSel", {20, 0.5f, +20.5f}, "Candidate Selection"};
 
   // ML
   ConfigurableAxis MLProb{"MLOutput", {100, 0.0f, 1.0f}, ""};
 
-  int NSigma0Cand = 0;
+  TRandom* rn = new TRandom();  
   void init(InitContext const&)
   {
     LOGF(info, "Initializing now: cross-checking correctness...");
@@ -316,6 +344,9 @@ struct sigmaanalysis {
     ccdb->setURL("http://alice-ccdb.cern.ch");
     ccdb->setCaching(true);
     ccdb->setFatalWhenNull(false);
+
+    // Setting EMCal geo objetc
+    emcalGeom = emcal::Geometry::GetInstanceFromRunNumber(300000); // TODO: if not using EMCal, don't use this
 
     // Event Counters
     histos.add("hEventCentrality", "hEventCentrality", kTH1D, {axisCentrality});
@@ -439,8 +470,9 @@ struct sigmaanalysis {
         histos.add(histodir + "/Sigma0/hRadius", "hRadius", kTH1D, {axisV0PairRadius});
         histos.add(histodir + "/Sigma0/h2dRadiusVspT", "h2dRadiusVspT", kTH2D, {axisV0PairRadius, axisPt});
         histos.add(histodir + "/Sigma0/hDCAPairDau", "hDCAPairDau", kTH1D, {axisDCAdau});
-        histos.add(histodir + "/Sigma0/h3dMass", "h3dMass", kTH3D, {axisCentrality, axisPt, axisSigmaMass});
+        histos.add(histodir + "/Sigma0/h3dMass", "h3dMass", kTH3D, {axisCentrality, axisPt, axisSigmaMass});        
         histos.add(histodir + "/Sigma0/h3dOPAngleVsMass", "h3dOPAngleVsMass", kTH3D, {{140, 0.0f, +7.0f}, axisPt, axisSigmaMass});
+        histos.add(histodir + "/Sigma0/h3dClusterEnergyVsMass", "h3dClusterEnergyVsMass", kTH3D, {axisClrEnergy, axisPt, axisSigmaMass});
 
         histos.add(histodir + "/ASigma0/hMass", "hMass", kTH1D, {axisSigmaMass});
         histos.add(histodir + "/ASigma0/hPt", "hPt", kTH1D, {axisPt});
@@ -450,6 +482,17 @@ struct sigmaanalysis {
         histos.add(histodir + "/ASigma0/hDCAPairDau", "hDCAPairDau", kTH1D, {axisDCAdau});
         histos.add(histodir + "/ASigma0/h3dMass", "h3dMass", kTH3D, {axisCentrality, axisPt, axisSigmaMass});
         histos.add(histodir + "/ASigma0/h3dOPAngleVsMass", "h3dOPAngleVsMass", kTH3D, {{140, 0.0f, +7.0f}, axisPt, axisSigmaMass});
+        histos.add(histodir + "/ASigma0/h3dClusterEnergyVsMass", "h3dClusterEnergyVsMass", kTH3D, {axisClrEnergy, axisPt, axisSigmaMass});
+                
+        if (rotationConfig.doRotation && histodir == "AfterSel") {
+          histos.add(histodir + "/RotBkg/h2dSigma0MassVsPt", "h2dSigma0MassVsPt", kTH2D, {axisSigmaMass, axisPt});
+          histos.add(histodir + "/RotBkg/h3dSigma0MassVsPt", "h3dSigma0MassVsPt", kTH3D, {axisCentrality, axisPt, axisSigmaMass});
+          histos.add(histodir + "/RotBkg/h3dClusterEnergyVsMass", "h3dClusterEnergyVsMass", kTH3D, {axisClrEnergy, axisPt, axisSigmaMass});
+          histos.add(histodir + "/RotBkg/h2dSigma0PtVsOPAngle", "h2dSigma0PtVsOPAngle", kTH2D, {axisPt, {140, 0.0f, +7.0f}});
+          histos.add(histodir + "/RotBkg/h2dDeltaEtaVsDeltaPhi", "h2dDeltaEtaVsDeltaPhi", kTH2D, {axisDeltaEta, axisDeltaPhi});
+          histos.add(histodir + "/RotBkg/hdDeltaPt", "hdDeltaPt", kTH1D, {axisReso});
+          histos.add(histodir + "/RotBkg/h2dEtaVsPhi", "h2dEtaVsPhi", kTH2D, {axisRapidity, axisPhi});
+        }
 
         // Process MC
         if (doprocessMonteCarlo || doprocessMonteCarloWithEMCal) {
@@ -488,6 +531,7 @@ struct sigmaanalysis {
           histos.add(histodir + "/MC/Sigma0/h2dMCProcessVsGenRadius", "h2dMCProcessVsGenRadius", kTH2D, {{50, -0.5f, 49.5f}, axisV0PairRadius});
           histos.add(histodir + "/MC/Sigma0/h3dMass", "h3dMass", kTH3D, {axisCentrality, axisPt, axisSigmaMass});
           histos.add(histodir + "/MC/Sigma0/h3dMCProcess", "h3dMCProcess", kTH3D, {{50, -0.5f, 49.5f}, axisPt, axisSigmaMass});
+          histos.add(histodir + "/MC/Sigma0/h3dClusterEnergyVsMass", "h3dClusterEnergyVsMass", kTH3D, {axisClrEnergy, axisPt, axisSigmaMass});
 
           histos.add(histodir + "/MC/ASigma0/hPt", "hPt", kTH1D, {axisPt});
           histos.add(histodir + "/MC/ASigma0/hMCPt", "hMCPt", kTH1D, {axisPt});
@@ -499,6 +543,10 @@ struct sigmaanalysis {
           histos.add(histodir + "/MC/ASigma0/h2dMCProcessVsGenRadius", "h2dMCProcessVsGenRadius", kTH2D, {{50, -0.5f, 49.5f}, axisV0PairRadius});
           histos.add(histodir + "/MC/ASigma0/h3dMass", "h3dMass", kTH3D, {axisCentrality, axisPt, axisSigmaMass});
           histos.add(histodir + "/MC/ASigma0/h3dMCProcess", "h3dMCProcess", kTH3D, {{50, -0.5f, 49.5f}, axisPt, axisSigmaMass});
+          histos.add(histodir + "/MC/ASigma0/h3dClusterEnergyVsMass", "h3dClusterEnergyVsMass", kTH3D, {axisClrEnergy, axisPt, axisSigmaMass});
+
+          histos.add(histodir + "/MC/h3dMassTrueBkg", "h3dMassTrueBkg", kTH3D, {axisCentrality, axisPt, axisSigmaMass});
+          histos.add(histodir + "/MC/h3dClusterEnergyVsMassTrueBkg", "h3dClusterEnergyVsMassTrueBkg", kTH3D, {axisClrEnergy, axisPt, axisSigmaMass});
 
           // pT Resolution:
           if (fillResoQAhistos) {
@@ -635,6 +683,22 @@ struct sigmaanalysis {
       return collision.centFV0A();
 
     return -1.f;
+  }
+
+  /// Returns if cluster is too close to edge of EMCal
+  bool isTooCloseToEdge(const int cellID, const int DistanceToBorder = 1)
+  {
+    if (DistanceToBorder <= 0)
+      return false;
+    if (cellID < 0)
+      return true;
+
+    // check distance to border in case the cell is okay
+    auto [iSupMod, iMod, iPhi, iEta] = emcalGeom->GetCellIndex(cellID);
+    auto [irow, icol] = emcalGeom->GetCellPhiEtaIndexInSModule(iSupMod, iMod, iPhi, iEta);
+    int iRowLast = (emcalGeom->GetSMType(iSupMod) == o2::emcal::EMCALSMType::EMCAL_THIRD || emcalGeom->GetSMType(iSupMod) == o2::emcal::EMCALSMType::DCAL_EXT) ? 8 : 24;
+
+    return (irow < DistanceToBorder || (iRowLast - irow) <= DistanceToBorder);
   }
 
   // ______________________________________________________
@@ -1197,6 +1261,10 @@ struct sigmaanalysis {
       histos.fill(HIST(MainDir[mode]) + HIST("/Sigma0/hDCAPairDau"), sigma.dcadaughters());
       histos.fill(HIST(MainDir[mode]) + HIST("/Sigma0/h3dMass"), centrality, sigma.pt(), sigma.sigma0Mass());
       histos.fill(HIST(MainDir[mode]) + HIST("/Sigma0/h3dOPAngleVsMass"), sigma.opAngle(), sigma.pt(), sigma.sigma0Mass());
+
+      if constexpr (requires { sigma.photonDefinition(); }) 
+        histos.fill(HIST(MainDir[mode]) + HIST("/Sigma0/h3dClusterEnergyVsMass"), sigma.photonEnergy(), sigma.pt(), sigma.sigma0Mass());
+
     } else {
       if (fillSelhistos) {
         histos.fill(HIST(MainDir[mode]) + HIST("/Lambda/h2dTPCvsTOFNSigma_ALambdaPr"), sigma.lambdaNegPrTPCNSigma(), sigma.aLambdaPrTOFNSigma());
@@ -1216,6 +1284,9 @@ struct sigmaanalysis {
       histos.fill(HIST(MainDir[mode]) + HIST("/ASigma0/hDCAPairDau"), sigma.dcadaughters());
       histos.fill(HIST(MainDir[mode]) + HIST("/ASigma0/h3dMass"), centrality, sigma.pt(), sigma.sigma0Mass());
       histos.fill(HIST(MainDir[mode]) + HIST("/ASigma0/h3dOPAngleVsMass"), sigma.opAngle(), sigma.pt(), sigma.sigma0Mass());
+
+      if constexpr (requires { sigma.photonDefinition(); }) 
+        histos.fill(HIST(MainDir[mode]) + HIST("/ASigma0/h3dClusterEnergyVsMass"), sigma.photonEnergy(), sigma.pt(), sigma.sigma0Mass());
     }
 
     //_______________________________________
@@ -1271,12 +1342,15 @@ struct sigmaanalysis {
           histos.fill(HIST(MainDir[mode]) + HIST("/MC/Sigma0/h2dMCPtVsLambdaMCPt"), sigma.mcpt(), sigma.lambdamcpt());
           histos.fill(HIST(MainDir[mode]) + HIST("/MC/Sigma0/h2dMCPtVsPhotonMCPt"), sigma.mcpt(), sigma.photonmcpt());
           histos.fill(HIST(MainDir[mode]) + HIST("/MC/Sigma0/hMass"), sigma.sigma0Mass());
-          histos.fill(HIST(MainDir[mode]) + HIST("/MC/Sigma0/h3dMass"), centrality, sigma.mcpt(), sigma.sigma0Mass());
+          histos.fill(HIST(MainDir[mode]) + HIST("/MC/Sigma0/h3dMass"), centrality, sigma.mcpt(), sigma.sigma0Mass());                    
 
           histos.fill(HIST(MainDir[mode]) + HIST("/MC/Sigma0/hMCProcess"), sigma.mcprocess());
           histos.fill(HIST(MainDir[mode]) + HIST("/MC/Sigma0/hGenRadius"), sigma.mcradius());
           histos.fill(HIST(MainDir[mode]) + HIST("/MC/Sigma0/h2dMCProcessVsGenRadius"), sigma.mcprocess(), sigma.mcradius());
           histos.fill(HIST(MainDir[mode]) + HIST("/MC/Sigma0/h3dMCProcess"), sigma.mcprocess(), sigma.mcpt(), sigma.sigma0Mass());
+
+          if constexpr (requires { sigma.photonDefinition(); }) 
+            histos.fill(HIST(MainDir[mode]) + HIST("/MC/Sigma0/h3dClusterEnergyVsMass"), sigma.photonEnergy(), sigma.pt(), sigma.sigma0Mass());
         }
 
         //_______________________________________
@@ -1288,14 +1362,23 @@ struct sigmaanalysis {
           histos.fill(HIST(MainDir[mode]) + HIST("/MC/ASigma0/h2dMCPtVsLambdaMCPt"), sigma.mcpt(), sigma.lambdamcpt());
           histos.fill(HIST(MainDir[mode]) + HIST("/MC/ASigma0/h2dMCPtVsPhotonMCPt"), sigma.mcpt(), sigma.photonmcpt());
           histos.fill(HIST(MainDir[mode]) + HIST("/MC/ASigma0/hMass"), sigma.sigma0Mass());
-          histos.fill(HIST(MainDir[mode]) + HIST("/MC/ASigma0/h3dMass"), centrality, sigma.mcpt(), sigma.sigma0Mass());
+          histos.fill(HIST(MainDir[mode]) + HIST("/MC/ASigma0/h3dMass"), centrality, sigma.mcpt(), sigma.sigma0Mass());          
 
           histos.fill(HIST(MainDir[mode]) + HIST("/MC/ASigma0/hMCProcess"), sigma.mcprocess());
           histos.fill(HIST(MainDir[mode]) + HIST("/MC/ASigma0/hGenRadius"), sigma.mcradius());
           histos.fill(HIST(MainDir[mode]) + HIST("/MC/ASigma0/h2dMCProcessVsGenRadius"), sigma.mcprocess(), sigma.mcradius());
           histos.fill(HIST(MainDir[mode]) + HIST("/MC/ASigma0/h3dMCProcess"), sigma.mcprocess(), sigma.mcpt(), sigma.sigma0Mass());
+
+          if constexpr (requires { sigma.photonDefinition(); }) 
+            histos.fill(HIST(MainDir[mode]) + HIST("/MC/ASigma0/h3dClusterEnergyVsMass"), sigma.photonEnergy(), sigma.pt(), sigma.sigma0Mass());            
         }
 
+        if (!sigma.isSigma0() && !sigma.isAntiSigma0()){
+          histos.fill(HIST(MainDir[mode]) + HIST("/MC/h3dMassTrueBkg"), centrality, sigma.pt(), sigma.sigma0Mass());                    
+          if constexpr (requires { sigma.photonDefinition(); }) 
+            histos.fill(HIST(MainDir[mode]) + HIST("/MC/h3dClusterEnergyVsMassTrueBkg"), sigma.photonEnergy(), sigma.pt(), sigma.sigma0Mass());
+        }
+          
         // For background studies:
         if (fillBkgQAhistos)
           runBkgAnalysis<mode>(sigma);
@@ -1376,6 +1459,7 @@ struct sigmaanalysis {
   template <typename TV0Object>
   bool selectPhoton(TV0Object const& cand)
   {
+    // TODO: Add option to analyze photons with ITS
     fillSelHistos<0>(cand, 22);
     if (cand.photonV0Type() != photonSelections.Photonv0TypeSel && photonSelections.Photonv0TypeSel > -1)
       return false;
@@ -1459,7 +1543,7 @@ struct sigmaanalysis {
       return false;
 
     // Number of Cells
-    if (cand.photonNCells() < EMCalPhotonSelections.MinCells)
+    if ((cand.photonNCells() < EMCalPhotonSelections.MinCells) || (cand.photonNCells() > EMCalPhotonSelections.MaxCells))
       return false;
 
     // Energy
@@ -1641,10 +1725,232 @@ struct sigmaanalysis {
     return true;
   }
 
+  // Apply selections in sigma0 candidates
+  template <typename TCollision, typename TSigma0sObject>
+  void calculateBackground(TCollision const& coll, std::vector<int> selSigma0Indices, std::unordered_map<int, std::vector<int>> photonToLambdaMap, std::unordered_map<int, std::vector<int>> LambdaToPhotonMap, TSigma0sObject const& fullSigma0s)
+  {
+
+    const double fixedAngle = o2::constants::math::PIHalf;
+    float centrality = getCentralityRun3(coll);
+    std::unordered_map<int, std::vector<int>> AssocMap;
+
+    if (rotationConfig.rotateLambdaAlso) AssocMap = LambdaToPhotonMap;
+    if (rotationConfig.rotatePhotonOnly) AssocMap = photonToLambdaMap;
+
+    if (rotationConfig.doCombinations){
+      // _______________________________________________
+      // SAFEGUARD: need at least 2 candidates 
+      if (selSigma0Indices.size() <= 3) {      
+        return;
+      }
+          
+      ROOT::Math::PxPyPzEVector lvRotationPhoton; // photon candidates which get rotated
+      ROOT::Math::PxPyPzEVector lvRotationLambda; // lambda candidates which get rotated
+      ROOT::Math::PxPyPzEVector lvRotationSigma0;    // rotation axis
+
+      // _______________________________________________
+      // LOOP over Sigma0 candidates
+      //for (size_t i = 0; i < selSigma0Indices.size(); ++i) { // TODO: remove me
+      for (auto const& [PartID, sigmaIndices] : AssocMap) { // Loop over unique photon IDs
+        
+        // Get unique photon info
+        auto sigma = fullSigma0s.rawIteratorAt(sigmaIndices[0]);
+        // int lambdaID = sigma.lambdaV0ID();
+        // int photonID = sigma.photonV0ID();
+        //auto sigma = fullSigma0s.rawIteratorAt(selSigma0Indices[i]);
+        
+        // _______________________________________________
+        // Build original 4-vectors
+        ROOT::Math::PxPyPzEVector lvGamma(sigma.photonPx(), sigma.photonPy(), sigma.photonPz(),
+            std::sqrt(std::pow(sigma.photonPx(), 2) + std::pow(sigma.photonPy(), 2) + std::pow(sigma.photonPz(), 2))); // E = |p|
+
+        ROOT::Math::PxPyPzEVector lvLambda(
+            sigma.lambdaPx(), sigma.lambdaPy(), sigma.lambdaPz(),
+            std::sqrt(std::pow(sigma.lambdaPx(), 2) +
+                      std::pow(sigma.lambdaPy(), 2) +
+                      std::pow(sigma.lambdaPz(), 2) +
+                      std::pow(o2::constants::physics::MassLambda0, 2)));
+
+        // axis = Sigma0 direction
+        ROOT::Math::PxPyPzEVector lvSigma = lvGamma + lvLambda;
+
+        // _______________________________________________
+        // ROTATION LOOP
+        for (int irot = 0; irot < rotationConfig.nRotations; ++irot) {
+
+          double angle = fixedAngle;
+          if (rotationConfig.useRandomAngle) {
+            angle = rn->Uniform(fixedAngle/2, (3/4)*fixedAngle); // avoid trivial rotations, TODO: change this to a configurable thing
+          }
+
+          // Define rotation axis
+          ROOT::Math::AxisAngle axis(lvSigma.Vect(), angle);
+          ROOT::Math::Rotation3D rotMatrix(axis);
+
+          // Rotated vectors (initialize as original)
+          auto lvGammaRot = lvGamma;
+          auto lvLambdaRot = lvLambda;
+
+          // _______________________________________________
+          // Apply rotation
+          if (rotationConfig.rotatePhotonOnly) {
+            lvGammaRot = rotMatrix * lvGamma;
+          }
+
+          if (rotationConfig.rotateLambdaAlso) {
+            lvLambdaRot = rotMatrix * lvLambda;
+          }
+
+          if (rotationConfig.RemoveCloseToEdge){
+            try {
+              int iCellID = emcalGeom->GetAbsCellIdFromEtaPhi(lvGammaRot.Eta(), lvGammaRot.Phi());
+              if (isTooCloseToEdge(iCellID, rotationConfig.DistanceToEdge))
+                continue;
+            } catch (o2::emcal::InvalidPositionException& e) {
+              continue;
+            }
+          }
+
+          // Sanity checks
+          histos.fill(HIST("AfterSel/RotBkg/h2dDeltaEtaVsDeltaPhi"), lvGamma.Eta() - lvGammaRot.Eta(), lvGamma.Phi() - lvGammaRot.Phi());
+          histos.fill(HIST("AfterSel/RotBkg/hdDeltaPt"), lvGamma.Pt() - lvGammaRot.Pt()); 
+          histos.fill(HIST("AfterSel/RotBkg/h2dEtaVsPhi"), lvGammaRot.Eta(), lvGammaRot.Phi());
+
+          // _______________________________________________
+          // LOOP over combinations
+          for (size_t j = 0; j < selSigma0Indices.size(); ++j) {                  
+            auto sigma2 = fullSigma0s.rawIteratorAt(selSigma0Indices[j]);
+            // if ((sigma2.lambdaV0ID() == lambdaID) && rotationConfig.rotatePhotonOnly) // avoid using the same lambda candidate
+            //  continue;
+            // if ((sigma2.photonV0ID() == photonID) && rotationConfig.rotateLambdaAlso) // avoid using the same photon candidate
+            //  continue;
+
+            // Getting 4-vectors of the other candidates to combine with the rotated one
+            ROOT::Math::PxPyPzEVector lvGamma2(
+                sigma2.photonPx(), sigma2.photonPy(), sigma2.photonPz(),
+                std::sqrt(std::pow(sigma2.photonPx(), 2) +
+                          std::pow(sigma2.photonPy(), 2) +
+                          std::pow(sigma2.photonPz(), 2)));
+
+            ROOT::Math::PxPyPzEVector lvLambda2(
+                sigma2.lambdaPx(), sigma2.lambdaPy(), sigma2.lambdaPz(),
+                std::sqrt(std::pow(sigma2.lambdaPx(), 2) +
+                          std::pow(sigma2.lambdaPy(), 2) +
+                          std::pow(sigma2.lambdaPz(), 2) +
+                          std::pow(o2::constants::physics::MassLambda0, 2)));
+
+
+            // _______________________________________________
+            // SELECT pairing mode
+            if (rotationConfig.rotatePhotonOnly){
+
+              ROOT::Math::PxPyPzEVector finalGamma1;
+              ROOT::Math::PxPyPzEVector finalLambda1;
+
+              // Pair 1
+              finalGamma1 = lvGammaRot;
+              finalLambda1 = lvLambda2; //rotationConfig.rotateLambdaAlso ? lvLambdaRot : lvLambda;
+                                      
+              // _______________________________________________
+              // Opening angle cut
+              double cosOA1 = finalGamma1.Vect().Dot(finalLambda1.Vect()) / (finalGamma1.P() * finalLambda1.P());
+              double openAngle1 = std::acos(cosOA1);
+              
+              if ((openAngle1 > rotationConfig.maxOpenAngle))
+                continue;
+
+              // _______________________________________________
+              // Build Sigma0 candidate
+              auto lvSigmaRot1 = finalGamma1 + finalLambda1;
+                            
+              float mass1 = lvSigmaRot1.M();
+              float pt1 = lvSigmaRot1.Pt();
+
+              // _______________________________________________
+              // Fill histograms          
+              histos.fill(HIST("AfterSel/RotBkg/h2dSigma0MassVsPt"), mass1, pt1);
+              histos.fill(HIST("AfterSel/RotBkg/h3dSigma0MassVsPt"), centrality, pt1, mass1);
+              histos.fill(HIST("AfterSel/RotBkg/h2dSigma0PtVsOPAngle"), pt1, openAngle1);        
+              
+              if constexpr (requires { sigma.photonDefinition(); }) 
+                histos.fill(HIST("AfterSel/RotBkg/h3dClusterEnergyVsMass"), sigma.photonEnergy(), pt1, mass1);
+
+            }
+
+            // Only if lambda was also rotated
+            if (rotationConfig.rotateLambdaAlso){
+              ROOT::Math::PxPyPzEVector finalGamma2;
+              ROOT::Math::PxPyPzEVector finalLambda2;
+
+              finalGamma2 = lvGamma2;
+              finalLambda2 = lvLambdaRot;
+
+              double cosOA2 = finalGamma2.Vect().Dot(finalLambda2.Vect()) / (finalGamma2.P() * finalLambda2.P());
+              double openAngle2 = std::acos(cosOA2);
+
+              auto lvSigmaRot2 = finalGamma2 + finalLambda2;
+              float mass2 = lvSigmaRot2.M();
+              float pt2 = lvSigmaRot2.Pt();
+
+              if (openAngle2 > rotationConfig.maxOpenAngle)
+                continue;
+
+              histos.fill(HIST("AfterSel/RotBkg/h2dSigma0MassVsPt"), mass2, pt2);
+              histos.fill(HIST("AfterSel/RotBkg/h3dSigma0MassVsPt"), centrality, pt2, mass2);              
+              histos.fill(HIST("AfterSel/RotBkg/h2dSigma0PtVsOPAngle"), pt2, openAngle2);
+
+              if constexpr (requires { sigma2.photonDefinition(); }) 
+                histos.fill(HIST("AfterSel/RotBkg/h3dClusterEnergyVsMass"), sigma2.photonEnergy(), pt2, mass2);
+              
+            }
+
+            // TODO: add checks with MC
+          }
+        }
+      }
+    }
+    else{ // just rotate photon in the sigma0 cand and recalculate mass      
+        // _______________________________________________
+      // LOOP over Sigma0 candidates
+      for (size_t i = 0; i < selSigma0Indices.size(); ++i) { // TODO: remove me                  
+        auto sigma = fullSigma0s.rawIteratorAt(selSigma0Indices[i]);
+
+        if constexpr (requires { sigma.photonDefinition(); }) { // Processing EMCal photon            
+        
+          ROOT::Math::PtEtaPhiMVector lvLambda(sigma.lambdaPt(), sigma.lambdaEta(), sigma.lambdaPhi(), o2::constants::physics::MassLambda0); // lambda
+
+          // _______________________________________________
+          // ROTATION LOOP
+          for (int irot = 0; irot < rotationConfig.nRotations; ++irot) {
+
+            double angle = fixedAngle;
+            if (rotationConfig.useRandomAngle) {
+              angle = rn->Uniform(fixedAngle/2, (3/4)*fixedAngle); // avoid trivial rotations, TODO: change this to a configurable thing
+            }
+
+            ROOT::Math::PtEtaPhiMVector lvRotationPhoton(sigma.photonEMCEta(), sigma.photonEta(), sigma.photonEMCPhi() + angle, 0); // photon candidates which get rotated
+            auto lvNewSigma = lvRotationPhoton + lvLambda;
+            float mass = lvNewSigma.M();
+            float pt = lvNewSigma.Pt();
+
+            histos.fill(HIST("AfterSel/RotBkg/h2dSigma0MassVsPt"), mass, pt);
+            histos.fill(HIST("AfterSel/RotBkg/h3dSigma0MassVsPt"), centrality, pt, mass);             
+
+          }
+        }
+      }
+    }       
+  }
+
   // Main analysis function
   template <typename TCollisions, typename TSigma0s>
   void analyzeRecoeSigma0s(TCollisions const& collisions, TSigma0s const& fullSigma0s)
   {
+    // Auxiliary objects to store best candidates
+    // std::vector<int> bestSigma0Array; 
+    // std::unordered_map<int, std::vector<int>> photonToLambdaMap;
+    // std::unordered_map<int, std::vector<int>> LambdaToPhotonMap;
+
     // Custom grouping
     std::vector<std::vector<int>> sigma0grouped(collisions.size());
 
@@ -1654,6 +1960,11 @@ struct sigmaanalysis {
 
     // Collisions loop
     for (const auto& coll : collisions) {
+
+      // Clear vectors // TODO: Clean this
+      // bestSigma0Array.clear();
+      // photonToLambdaMap.clear();
+      // LambdaToPhotonMap.clear();
 
       // Event selection
       if (!IsEventAccepted(coll, true)) // TODO: Should I Add event selection for events without EMCal?
@@ -1681,11 +1992,124 @@ struct sigmaanalysis {
 
         // Fill histos after all selections
         fillHistos<1>(sigma0, coll);
+
+        // bestSigma0Array.push_back(sigma0.globalIndex()); // Save indices of best sigma0 candidates
+        // photonToLambdaMap[sigma0.photonV0ID()].push_back(sigma0.globalIndex()); 
+        // LambdaToPhotonMap[sigma0.lambdaV0ID()].push_back(sigma0.globalIndex());
       }
+      
+      //if (rotationConfig.doRotation) calculateBackground(coll, bestSigma0Array, photonToLambdaMap, LambdaToPhotonMap, fullSigma0s); // remove me
     }
 
     // Optionally run QA analysis for reco sigma0
     // if (fdoSigma0QA) doSigma0QA(fullSigma0s); // TODO: improve this to run sigma0 QA
+  }
+
+  // Main function to do background estimation
+  using BinningType = ColumnBinningPolicy<aod::collision::PosZ, aod::cent::CentFT0C>; // TODO: allow flexibility to choose centrality estimator
+  BinningType colBinning{{axisVertex, axisCentrality}}; 
+  template <typename TCollisions, typename TSigma0s>
+  void runSigma0EMCBkg(TCollisions const& collisions, TSigma0s const& fullSigma0s)
+  {
+    // 1. Setup and pre-selection step
+
+    // Auxiliary objects to store best candidates / Unique photons and lambdas (for the whole DF)
+    std::vector<int> bestSigma0Array;         
+    std::vector<std::unordered_map<int,int>> photonMap(collisions.size());
+    std::vector<std::unordered_map<int,int>> lambdaMap(collisions.size());
+        
+    // Custom grouping
+    std::vector<std::vector<int>> sigma0grouped(collisions.size());
+    std::vector<std::vector<int>> bestsigma0grouped(collisions.size());    
+
+    for (const auto& sigma0 : fullSigma0s) {
+      sigma0grouped[sigma0.straCollisionId()].push_back(sigma0.globalIndex());
+    }
+
+    // Collisions loop
+    for (const auto& coll : collisions) {
+      // Event selection
+      if (!IsEventAccepted(coll, true)) // TODO: Should I Add event selection for events without EMCal?
+        continue; 
+
+      // Sigma0s loop
+      for (size_t i = 0; i < sigma0grouped[coll.globalIndex()].size(); i++) {
+        auto sigma0 = fullSigma0s.rawIteratorAt(sigma0grouped[coll.globalIndex()][i]);
+                
+        // Select sigma0 candidates
+        if (!processSigma0Candidate(sigma0))
+          continue;
+
+        // Fill maps        
+        bestsigma0grouped[sigma0.straCollisionId()].push_back(sigma0.globalIndex());        
+        photonMap[coll.globalIndex()][sigma0.photonV0ID()] = sigma0.globalIndex(); // unique photons per collision
+        lambdaMap[coll.globalIndex()][sigma0.lambdaV0ID()] = sigma0.globalIndex(); // unique lambdas per collision
+      }      
+
+      // Rotational background (same event) 
+      if (doRotation){
+        // TODO: implement the method
+      }
+    }
+                
+    // Event Mixing 
+    if (doEvtMixing){
+      for (auto& [collision1, collision2] : selfCombinations(colBinning, nMix, -1, collisions, collisions)) { // TODO: declare nMix
+
+        // Safeguards
+        if (collision1.globalIndex() == collision2.globalIndex())
+          continue; // skip same event
+        
+        // TODO: Add histogram of delta collision time to check the distribution and decide the best cut value for deltaCollision
+        histos.fill(HIST("AfterSel/Bkg/hDeltaCollision"), collision1.globalIndex() - collision2.globalIndex());
+        histos.fill(HIST("AfterSel/Bkg/h2dCentralityCollPair"), getCentralityRun3(collision1), getCentralityRun3(collision2));
+
+        if (lambdaMap[collision1.globalIndex()].size() == 0 || photonMap[collision2.globalIndex()].size() == 0)
+          continue; // skip if no candidates in one of the events
+
+        if (TMath::Abs(collision1.globalIndex() - collision2.globalIndex()) < deltaCollision) // TODO: change this to a configurable thing, just to be sure we are not mixing events that are too close in time (and therefore might be correlated)
+          continue;
+
+        // Loop over unique lambdas of collision 1
+        for (const auto& [lambdaID, sigmaIdx1] : lambdaMap[collision1.globalIndex()]) {
+          auto lambda = fullSigma0s.rawIteratorAt(sigmaIdx1);
+
+          // TODO: If you want to do rotation, this is the place!
+
+          // Lambda 4-vector
+          ROOT::Math::PxPyPzEVector FourMomLambda(sigma.lambdaPx(), sigma.lambdaPy(), sigma.lambdaPz(), 
+                                            std::sqrt(std::pow(sigma.lambdap(), 2) + std::pow(o2::constants::physics::MassLambda0, 2)));
+          
+          // Loop over unique lambdas of collision 2
+          for (const auto& [photonID, sigmaIdx2] : photonMap[collision2.globalIndex()]) {
+            auto photon = fullSigma0s.rawIteratorAt(sigmaIdx2);
+
+            ROOT::Math::PxPyPzEVector FourMomPhoton(sigma.photonPx(), sigma.photonPy(), sigma.photonPz(), std::sqrt(std::pow(sigma.photonp(), 2))); 
+
+            // Sigma0 4-vector
+            ROOT::Math::PxPyPzEVector FourMomSigma0 = FourMomPhoton + FourMomLambda;
+            
+            double cosOA = FourMomPhoton.Vect().Dot(FourMomLambda.Vect()) / (FourMomPhoton.P() * FourMomLambda.P());
+            double openAngle = std::acos(cosOA);
+            float mass = FourMomSigma0.M();
+            float pt = FourMomSigma0.Pt();
+
+            // _______________________________________________
+            // Opening angle cut
+            if ((openAngle > maxOpenAngle))
+              continue;
+
+            histos.fill(HIST("AfterSel/Bkg/h2dSigma0MassVsPt"), mass, pt);
+            histos.fill(HIST("AfterSel/Bkg/h3dSigma0MassVsPt"), centrality, pt, mass);
+            histos.fill(HIST("AfterSel/Bkg/h2dSigma0PtVsOPAngle"), pt, openAngle);  
+                      
+          } // end of photon loop
+                                        
+        } // end of lambda loop        
+      } // end of event mixing loop
+    }
+    
+    // TODO: generalize this to run over several DFs
   }
 
   // Apply selections in sigma0 candidates
@@ -1857,6 +2281,11 @@ struct sigmaanalysis {
   void processGeneratedRun3(soa::Join<aod::StraMCCollisions, aod::StraMCCollMults> const& mcCollisions, soa::Join<aod::StraCollisions, aod::StraCents, aod::StraEvSels, aod::StraStamps, aod::StraCollLabels> const& collisions, soa::Join<aod::Sigma0Gens, aod::SigmaGenCollRef> const& Sigma0Gens)
   {
     analyzeGenerated(mcCollisions, collisions, Sigma0Gens);
+  }
+
+  void processEMCBackground(soa::Join<aod::StraCollisions, aod::StraCents, aod::StraEvSels, aod::StraStamps> const& collisions, Sigma0sWithEMCal const& fullSigma0s)
+  {
+    runSigma0EMCBkg(collisions, fullSigma0s);
   }
 
   // _____________________________________________________
